@@ -82,38 +82,7 @@ WHERE name ILIKE '%' || sqlc.arg(keyword)::text || '%'
 ORDER BY solo_rank_power DESC NULLS LAST
 LIMIT sqlc.arg(lim);
 
--- Match đã kết thúc không đổi nên trùng id thì bỏ qua.
--- name: InsertMatch :exec
-INSERT INTO lol_matches (
-    id, server, mode, patch, game_start_at, duration_sec, is_remake, estimated_rank,
-    banned_champion_ids,
-    winning_team,
-    team_1_kills, team_1_dragon_kills, team_1_herald_kills, team_1_baron_kills,
-    team_2_kills, team_2_dragon_kills, team_2_herald_kills, team_2_baron_kills
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-ON CONFLICT (id) DO NOTHING;
-
--- name: InsertMatchParticipant :exec
-INSERT INTO lol_match_participants (
-    match_id, team, is_win, player_id,
-    riot_name, riot_tag, rank_power,
-    champion_id, champ_level, position,
-    kills, deaths, assists, kda, kill_participation,
-    gold_earned, minions_killed, neutral_minions_killed, cs,
-    dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
-    perf_score,
-    spell1_id, spell2_id,
-    rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
-    items
-)
-VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
-)
-ON CONFLICT (match_id, player_id) DO NOTHING;
-
--- Bản batch của InsertMatch: pgx gửi cả list trong 1 round trip.
+-- Batch: pgx gửi cả list trong 1 round trip. Match đã kết thúc không đổi nên trùng id thì bỏ qua.
 -- name: InsertMatches :batchexec
 INSERT INTO lol_matches (
     id, server, mode, patch, game_start_at, duration_sec, is_remake, estimated_rank,
@@ -125,7 +94,7 @@ INSERT INTO lol_matches (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 ON CONFLICT (id) DO NOTHING;
 
--- Bản batch của InsertMatchParticipant.
+-- Batch, trùng (match_id, player_id) thì bỏ qua.
 -- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
     match_id, team, is_win, player_id,

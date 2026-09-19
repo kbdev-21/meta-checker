@@ -80,7 +80,7 @@ type InsertMatchParticipantsParams struct {
 	Items                []int32     `json:"items"`
 }
 
-// Bản batch của InsertMatchParticipant.
+// Batch, trùng (match_id, player_id) thì bỏ qua.
 func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatchParticipantsParams) *InsertMatchParticipantsBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
@@ -186,7 +186,7 @@ type InsertMatchesParams struct {
 	Team2BaronKills   int16              `json:"team2BaronKills"`
 }
 
-// Bản batch của InsertMatch: pgx gửi cả list trong 1 round trip.
+// Batch: pgx gửi cả list trong 1 round trip. Match đã kết thúc không đổi nên trùng id thì bỏ qua.
 func (q *Queries) InsertMatches(ctx context.Context, arg []InsertMatchesParams) *InsertMatchesBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {

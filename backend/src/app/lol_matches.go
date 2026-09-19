@@ -169,51 +169,10 @@ func ToLolMatchParticipant(p db.LolMatchParticipant) LolMatchParticipant {
 
 // ---------- logic ----------
 
-// Map MatchDto của Riot rồi insert match + participants trong 1 transaction.
-// Match đã có thì không ghi đè (DO NOTHING). Trả về match đọc lại từ DB.
-// rank_power / estimated_rank lấy từ solo rank của các participant đã có trong lol_players.
-func (a *Application) SaveLolMatchToDb(ctx context.Context, match *external.MatchDto) (LolMatch, error) {
-	rankPowers, err := a.rankPowersOf(ctx, puuidsOf(match))
-	if err != nil {
-		return LolMatch{}, err
-	}
-	matchParams, participantParams := insertParamsOf(match, rankPowers)
-
-	tx, err := a.p.Begin(ctx)
-	if err != nil {
-		return LolMatch{}, err
-	}
-	defer tx.Rollback(ctx)
-	q := a.q.WithTx(tx)
-
-	err = q.InsertMatch(ctx, matchParams)
-	if err != nil {
-		return LolMatch{}, err
-	}
-	for _, pp := range participantParams {
-		err = q.InsertMatchParticipant(ctx, pp)
-		if err != nil {
-			return LolMatch{}, err
-		}
-	}
-	err = tx.Commit(ctx)
-	if err != nil {
-		return LolMatch{}, err
-	}
-
-	// Vừa insert xong nên luôn có; không có là lỗi.
-	matches, err := a.getLolMatchesByIds(ctx, []string{matchParams.ID})
-	if err != nil {
-		return LolMatch{}, err
-	}
-	if len(matches) == 0 {
-		return LolMatch{}, fmt.Errorf("match %s not found after insert", matchParams.ID)
-	}
-	return matches[0], nil
-}
-
-// Bản batch của SaveLolMatchToDb: 1 query lấy rank của mọi participant, insert tất cả match + participants
-// bằng pgx batch trong 1 transaction, rồi đọc lại 1 lần. 1 match lỗi => không match nào được lưu.
+// Map MatchDto của Riot rồi lưu: 1 query lấy rank của mọi participant (rank_power / estimated_rank
+// lấy từ solo rank của các participant đã có trong lol_players), insert tất cả match + participants
+// bằng pgx batch trong 1 transaction, rồi đọc lại 1 lần. Match đã có thì không ghi đè (DO NOTHING).
+// 1 match lỗi => không match nào được lưu.
 // Kết quả theo game_start_at giảm dần.
 func (a *Application) SaveLolMatchesToDb(ctx context.Context, matches []*external.MatchDto) ([]LolMatch, error) {
 	if len(matches) == 0 {
@@ -235,10 +194,8 @@ func (a *Application) SaveLolMatchesToDb(ctx context.Context, matches []*externa
 	for _, m := range matches {
 		mp, pps := insertParamsOf(m, rankPowers)
 		ids = append(ids, mp.ID)
-		matchParams = append(matchParams, db.InsertMatchesParams(mp))
-		for _, pp := range pps {
-			participantParams = append(participantParams, db.InsertMatchParticipantsParams(pp))
-		}
+		matchParams = append(matchParams, mp)
+		participantParams = append(participantParams, pps...)
 	}
 
 	tx, err := a.p.Begin(ctx)
@@ -425,9 +382,9 @@ func (a *Application) rankPowersOf(ctx context.Context, puuids []string) (map[st
 }
 
 // Map MatchDto thành params insert match + participants. rankPowers từ rankPowersOf.
-func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nullable[int32]) (db.InsertMatchParams, []db.InsertMatchParticipantParams) {
+func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nullable[int32]) (db.InsertMatchesParams, []db.InsertMatchParticipantsParams) {
 	info := match.Info
-	matchParams := db.InsertMatchParams{
+	matchParams := db.InsertMatchesParams{
 		ID:                match.Metadata.MatchId,
 		Server:            info.PlatformId,
 		Mode:              string(lolGameModeOf(info.QueueId, info.MapId)),
@@ -462,7 +419,7 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 		}
 	}
 
-	participantParams := make([]db.InsertMatchParticipantParams, 0, len(info.Participants))
+	participantParams := make([]db.InsertMatchParticipantsParams, 0, len(info.Participants))
 	knownRankPowers := []int32{}
 	for _, p := range info.Participants {
 		if p.GameEndedInEarlySurrender {
@@ -492,7 +449,7 @@ func execBatch(exec func(func(int, error))) error {
 	return firstErr
 }
 
-func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int) db.InsertMatchParticipantParams {
+func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int) db.InsertMatchParticipantsParams {
 	var primary, sub external.PerkStyleDto
 	for _, s := range p.Perks.Styles {
 		switch s.Description {
@@ -519,7 +476,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		killParticipation = float32(p.Kills+p.Assists) / float32(teamKills)
 	}
 
-	return db.InsertMatchParticipantParams{
+	return db.InsertMatchParticipantsParams{
 		MatchID:              matchId,
 		Team:                 teamOf(p.TeamId),
 		IsWin:                p.Win,

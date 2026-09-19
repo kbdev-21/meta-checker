@@ -167,11 +167,6 @@ func (c *RiotClient) GetMatchesByIdsInParallel(ctx context.Context, region strin
 	return out, nil
 }
 
-func (c *RiotClient) GetMatchTimeline(ctx context.Context, region, matchId string) (*TimelineDto, error) {
-	var out TimelineDto
-	return &out, c.get(ctx, region, "/lol/match/v5/matches/"+matchId+"/timeline", nil, &out)
-}
-
 // ---------- summoner-v4 ----------
 
 func (c *RiotClient) GetSummonerByPuuid(ctx context.Context, platform, puuid string) (*SummonerDto, error) {
