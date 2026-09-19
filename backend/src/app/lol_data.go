@@ -27,28 +27,6 @@ const (
 	ItemTypeLegendary  ItemType = "LEGENDARY"  // có from, không into
 )
 
-// Xét theo thứ tự trên. ok = false nếu không thuộc loại nào (item không mua được, item riêng của tướng...).
-func itemTypeOf(it external.DDItem) (t ItemType, ok bool) {
-	hasFrom, hasInto := len(it.From) > 0, len(it.Into) > 0
-	switch {
-	case slices.Contains(it.Tags, "Consumable"):
-		return ItemTypeConsumable, true
-	case slices.Contains(it.Tags, "Trinket"):
-		return ItemTypeTrinket, true
-	case slices.Contains(it.Tags, "Boots"):
-		return ItemTypeBoots, true
-	case !hasFrom && !hasInto && it.Gold.Purchasable:
-		return ItemTypeStarter, true
-	case !hasFrom && hasInto:
-		return ItemTypeBasic, true
-	case hasFrom && hasInto:
-		return ItemTypeEpic, true
-	case hasFrom && !hasInto:
-		return ItemTypeLegendary, true
-	}
-	return "", false
-}
-
 // ---------- entity ----------
 
 type Champion struct {
@@ -61,8 +39,8 @@ type Champion struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func NewChampion(c db.Champion) *Champion {
-	return &Champion{
+func ToChampion(c db.Champion) Champion {
+	return Champion{
 		Id:        c.ID,
 		Slug:      c.Slug,
 		Name:      c.Name,
@@ -87,8 +65,8 @@ type Item struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func NewItem(i db.Item) *Item {
-	return &Item{
+func ToItem(i db.Item) Item {
+	return Item{
 		Id:        i.ID,
 		Name:      i.Name,
 		Plaintext: i.Plaintext,
@@ -103,33 +81,31 @@ func NewItem(i db.Item) *Item {
 	}
 }
 
-// ---------- get ----------
+// ---------- logic ----------
 
-func (a *Application) GetChampions(ctx context.Context) ([]*Champion, error) {
+func (a *Application) GetChampions(ctx context.Context) ([]Champion, error) {
 	rows, err := a.q.ListChampions(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []*Champion{}
+	out := []Champion{}
 	for _, r := range rows {
-		out = append(out, NewChampion(r))
+		out = append(out, ToChampion(r))
 	}
 	return out, nil
 }
 
-func (a *Application) GetItems(ctx context.Context) ([]*Item, error) {
+func (a *Application) GetItems(ctx context.Context) ([]Item, error) {
 	rows, err := a.q.ListItems(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []*Item{}
+	out := []Item{}
 	for _, r := range rows {
-		out = append(out, NewItem(r))
+		out = append(out, ToItem(r))
 	}
 	return out, nil
 }
-
-// ---------- upsert ----------
 
 func (a *Application) UpsertChampions(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
@@ -219,4 +195,28 @@ func (a *Application) UpsertItems(ctx context.Context) error {
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+// ---------- private ----------
+
+// Xét theo thứ tự các ItemType ở trên. ok = false nếu không thuộc loại nào (item không mua được, item riêng của tướng...).
+func itemTypeOf(it external.DDItem) (t ItemType, ok bool) {
+	hasFrom, hasInto := len(it.From) > 0, len(it.Into) > 0
+	switch {
+	case slices.Contains(it.Tags, "Consumable"):
+		return ItemTypeConsumable, true
+	case slices.Contains(it.Tags, "Trinket"):
+		return ItemTypeTrinket, true
+	case slices.Contains(it.Tags, "Boots"):
+		return ItemTypeBoots, true
+	case !hasFrom && !hasInto && it.Gold.Purchasable:
+		return ItemTypeStarter, true
+	case !hasFrom && hasInto:
+		return ItemTypeBasic, true
+	case hasFrom && hasInto:
+		return ItemTypeEpic, true
+	case hasFrom && !hasInto:
+		return ItemTypeLegendary, true
+	}
+	return "", false
 }

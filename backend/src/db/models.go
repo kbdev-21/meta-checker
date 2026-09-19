@@ -31,3 +31,30 @@ type Item struct {
 	Version   string             `json:"version"`
 	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
 }
+
+type Player struct {
+	ID              string             `json:"id"`
+	Server          string             `json:"server"`
+	Name            string             `json:"name"`
+	Tag             string             `json:"tag"`
+	NormalizedName  string             `json:"normalizedName"`
+	NormalizedTag   string             `json:"normalizedTag"`
+	ProfileIconID   pgtype.Int4        `json:"profileIconId"`
+	SummonerLevel   pgtype.Int4        `json:"summonerLevel"`
+	SearchString    string             `json:"searchString"`
+	SoloRank        pgtype.Text        `json:"soloRank"`
+	SoloTier        pgtype.Text        `json:"soloTier"`
+	SoloLp          int32              `json:"soloLp"`
+	SoloRankPower   pgtype.Int4        `json:"soloRankPower"`
+	SoloWins        int32              `json:"soloWins"`
+	SoloLosses      int32              `json:"soloLosses"`
+	FlexRank        pgtype.Text        `json:"flexRank"`
+	FlexTier        pgtype.Text        `json:"flexTier"`
+	FlexLp          int32              `json:"flexLp"`
+	FlexWins        int32              `json:"flexWins"`
+	FlexLosses      int32              `json:"flexLosses"`
+	LastMatchAt     pgtype.Timestamptz `json:"lastMatchAt"`
+	MatchesSyncedAt pgtype.Timestamptz `json:"matchesSyncedAt"`
+	CreatedAt       pgtype.Timestamptz `json:"createdAt"`
+	UpdatedAt       pgtype.Timestamptz `json:"updatedAt"`
+}

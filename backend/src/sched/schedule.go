@@ -12,6 +12,7 @@ func StartEveryHour(a *app.Application) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 
+	fmt.Println("Schedule: EveryHour")
 	upsertLolData(a)
 	for range ticker.C {
 		fmt.Println("Schedule: EveryHour")

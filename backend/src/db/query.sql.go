@@ -7,7 +7,87 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const getPlayerById = `-- name: GetPlayerById :one
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE id = $1
+`
+
+func (q *Queries) GetPlayerById(ctx context.Context, id string) (Player, error) {
+	row := q.db.QueryRow(ctx, getPlayerById, id)
+	var i Player
+	err := row.Scan(
+		&i.ID,
+		&i.Server,
+		&i.Name,
+		&i.Tag,
+		&i.NormalizedName,
+		&i.NormalizedTag,
+		&i.ProfileIconID,
+		&i.SummonerLevel,
+		&i.SearchString,
+		&i.SoloRank,
+		&i.SoloTier,
+		&i.SoloLp,
+		&i.SoloRankPower,
+		&i.SoloWins,
+		&i.SoloLosses,
+		&i.FlexRank,
+		&i.FlexTier,
+		&i.FlexLp,
+		&i.FlexWins,
+		&i.FlexLosses,
+		&i.LastMatchAt,
+		&i.MatchesSyncedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPlayerByNameAndTag = `-- name: GetPlayerByNameAndTag :one
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE normalized_name = $1 AND normalized_tag = $2
+`
+
+type GetPlayerByNameAndTagParams struct {
+	NormalizedName string `json:"normalizedName"`
+	NormalizedTag  string `json:"normalizedTag"`
+}
+
+// Truyền vào name / tag đã normalize (chữ thường + trim).
+func (q *Queries) GetPlayerByNameAndTag(ctx context.Context, arg GetPlayerByNameAndTagParams) (Player, error) {
+	row := q.db.QueryRow(ctx, getPlayerByNameAndTag, arg.NormalizedName, arg.NormalizedTag)
+	var i Player
+	err := row.Scan(
+		&i.ID,
+		&i.Server,
+		&i.Name,
+		&i.Tag,
+		&i.NormalizedName,
+		&i.NormalizedTag,
+		&i.ProfileIconID,
+		&i.SummonerLevel,
+		&i.SearchString,
+		&i.SoloRank,
+		&i.SoloTier,
+		&i.SoloLp,
+		&i.SoloRankPower,
+		&i.SoloWins,
+		&i.SoloLosses,
+		&i.FlexRank,
+		&i.FlexTier,
+		&i.FlexLp,
+		&i.FlexWins,
+		&i.FlexLosses,
+		&i.LastMatchAt,
+		&i.MatchesSyncedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
 
 const listChampions = `-- name: ListChampions :many
 SELECT id, slug, name, title, img_url, version, updated_at FROM champions ORDER BY name
@@ -65,6 +145,66 @@ func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
 			&i.IsSr,
 			&i.ImgUrl,
 			&i.Version,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchPlayers = `-- name: SearchPlayers :many
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players
+WHERE name ILIKE '%' || $1::text || '%'
+   OR tag ILIKE '%' || $1::text || '%'
+   OR search_string LIKE '%' || $2::text || '%'
+ORDER BY solo_rank_power DESC NULLS LAST
+LIMIT $3
+`
+
+type SearchPlayersParams struct {
+	Keyword           string `json:"keyword"`
+	NormalizedKeyword string `json:"normalizedKeyword"`
+	Lim               int32  `json:"lim"`
+}
+
+func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([]Player, error) {
+	rows, err := q.db.Query(ctx, searchPlayers, arg.Keyword, arg.NormalizedKeyword, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Player
+	for rows.Next() {
+		var i Player
+		if err := rows.Scan(
+			&i.ID,
+			&i.Server,
+			&i.Name,
+			&i.Tag,
+			&i.NormalizedName,
+			&i.NormalizedTag,
+			&i.ProfileIconID,
+			&i.SummonerLevel,
+			&i.SearchString,
+			&i.SoloRank,
+			&i.SoloTier,
+			&i.SoloLp,
+			&i.SoloRankPower,
+			&i.SoloWins,
+			&i.SoloLosses,
+			&i.FlexRank,
+			&i.FlexTier,
+			&i.FlexLp,
+			&i.FlexWins,
+			&i.FlexLosses,
+			&i.LastMatchAt,
+			&i.MatchesSyncedAt,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -151,6 +291,89 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
 		arg.IsSr,
 		arg.ImgUrl,
 		arg.Version,
+	)
+	return err
+}
+
+const upsertPlayer = `-- name: UpsertPlayer :exec
+INSERT INTO players (
+    id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string,
+    solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses,
+    flex_rank, flex_tier, flex_lp, flex_wins, flex_losses
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+ON CONFLICT (id) DO UPDATE SET
+    server          = EXCLUDED.server,
+    name            = EXCLUDED.name,
+    tag             = EXCLUDED.tag,
+    normalized_name = EXCLUDED.normalized_name,
+    normalized_tag  = EXCLUDED.normalized_tag,
+    profile_icon_id = COALESCE(EXCLUDED.profile_icon_id, players.profile_icon_id),
+    summoner_level  = COALESCE(EXCLUDED.summoner_level, players.summoner_level),
+    search_string   = EXCLUDED.search_string,
+
+    solo_rank       = COALESCE(EXCLUDED.solo_rank, players.solo_rank),
+    solo_tier       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_tier       ELSE EXCLUDED.solo_tier       END,
+    solo_lp         = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_lp         ELSE EXCLUDED.solo_lp         END,
+    solo_rank_power = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_rank_power ELSE EXCLUDED.solo_rank_power END,
+    solo_wins       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_wins       ELSE EXCLUDED.solo_wins       END,
+    solo_losses     = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_losses     ELSE EXCLUDED.solo_losses     END,
+
+    flex_rank       = COALESCE(EXCLUDED.flex_rank, players.flex_rank),
+    flex_tier       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_tier   ELSE EXCLUDED.flex_tier   END,
+    flex_lp         = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_lp     ELSE EXCLUDED.flex_lp     END,
+    flex_wins       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_wins   ELSE EXCLUDED.flex_wins   END,
+    flex_losses     = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_losses ELSE EXCLUDED.flex_losses END,
+
+    updated_at      = now()
+`
+
+type UpsertPlayerParams struct {
+	ID             string      `json:"id"`
+	Server         string      `json:"server"`
+	Name           string      `json:"name"`
+	Tag            string      `json:"tag"`
+	NormalizedName string      `json:"normalizedName"`
+	NormalizedTag  string      `json:"normalizedTag"`
+	ProfileIconID  pgtype.Int4 `json:"profileIconId"`
+	SummonerLevel  pgtype.Int4 `json:"summonerLevel"`
+	SearchString   string      `json:"searchString"`
+	SoloRank       pgtype.Text `json:"soloRank"`
+	SoloTier       pgtype.Text `json:"soloTier"`
+	SoloLp         int32       `json:"soloLp"`
+	SoloRankPower  pgtype.Int4 `json:"soloRankPower"`
+	SoloWins       int32       `json:"soloWins"`
+	SoloLosses     int32       `json:"soloLosses"`
+	FlexRank       pgtype.Text `json:"flexRank"`
+	FlexTier       pgtype.Text `json:"flexTier"`
+	FlexLp         int32       `json:"flexLp"`
+	FlexWins       int32       `json:"flexWins"`
+	FlexLosses     int32       `json:"flexLosses"`
+}
+
+// Rank solo/flex truyền vào NULL (unknown) thì giữ nguyên cả nhóm cột rank cũ.
+func (q *Queries) UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) error {
+	_, err := q.db.Exec(ctx, upsertPlayer,
+		arg.ID,
+		arg.Server,
+		arg.Name,
+		arg.Tag,
+		arg.NormalizedName,
+		arg.NormalizedTag,
+		arg.ProfileIconID,
+		arg.SummonerLevel,
+		arg.SearchString,
+		arg.SoloRank,
+		arg.SoloTier,
+		arg.SoloLp,
+		arg.SoloRankPower,
+		arg.SoloWins,
+		arg.SoloLosses,
+		arg.FlexRank,
+		arg.FlexTier,
+		arg.FlexLp,
+		arg.FlexWins,
+		arg.FlexLosses,
 	)
 	return err
 }

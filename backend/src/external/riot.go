@@ -3,6 +3,7 @@ package external
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,23 @@ type RiotClient struct {
 
 func NewRiotClient(apiKey string) *RiotClient {
 	return &RiotClient{apiKey: apiKey, http: &http.Client{Timeout: 10 * time.Second}}
+}
+
+// Riot trả status khác 200.
+type RiotError struct {
+	Path       string
+	StatusCode int
+	Body       string
+}
+
+func (e *RiotError) Error() string {
+	return fmt.Sprintf("riot api %s: %d %s", e.Path, e.StatusCode, e.Body)
+}
+
+// Riot trả 404: resource (account, summoner...) không tồn tại.
+func IsRiotNotFound(err error) bool {
+	var re *RiotError
+	return errors.As(err, &re) && re.StatusCode == http.StatusNotFound
 }
 
 func (c *RiotClient) get(ctx context.Context, host, path string, query url.Values, out any) error {
@@ -41,7 +59,7 @@ func (c *RiotClient) get(ctx context.Context, host, path string, query url.Value
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("riot api %s: %d %s", path, res.StatusCode, body)
+		return &RiotError{Path: path, StatusCode: res.StatusCode, Body: string(body)}
 	}
 	return json.NewDecoder(res.Body).Decode(out)
 }
