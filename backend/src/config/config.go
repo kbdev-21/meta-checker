@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Port                  string
 	PostgresConnectionUrl string
+	RiotApiKey            string
 }
 
 func LoadConfig() Config {
@@ -23,5 +24,6 @@ func LoadConfig() Config {
 	return Config{
 		Port:                  port,
 		PostgresConnectionUrl: os.Getenv("POSTGRES_CONNECTION_URL"),
+		RiotApiKey:            os.Getenv("RIOT_API_KEY"),
 	}
 }

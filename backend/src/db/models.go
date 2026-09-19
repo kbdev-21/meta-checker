@@ -3,3 +3,31 @@
 //   sqlc v1.29.0
 
 package db
+
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type Champion struct {
+	ID        int32              `json:"id"`
+	Slug      string             `json:"slug"`
+	Name      string             `json:"name"`
+	Title     string             `json:"title"`
+	ImgUrl    string             `json:"imgUrl"`
+	Version   string             `json:"version"`
+	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
+}
+
+type Item struct {
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	Plaintext string             `json:"plaintext"`
+	Type      string             `json:"type"`
+	GoldTotal int32              `json:"goldTotal"`
+	FromItems []int32            `json:"fromItems"`
+	IntoItems []int32            `json:"intoItems"`
+	IsSr      bool               `json:"isSr"`
+	ImgUrl    string             `json:"imgUrl"`
+	Version   string             `json:"version"`
+	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
+}

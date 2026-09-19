@@ -9,13 +9,148 @@ import (
 	"context"
 )
 
-const ping = `-- name: Ping :one
-SELECT 1::int AS ok
+const listChampions = `-- name: ListChampions :many
+SELECT id, slug, name, title, img_url, version, updated_at FROM champions ORDER BY name
 `
 
-func (q *Queries) Ping(ctx context.Context) (int32, error) {
-	row := q.db.QueryRow(ctx, ping)
-	var ok int32
-	err := row.Scan(&ok)
-	return ok, err
+func (q *Queries) ListChampions(ctx context.Context) ([]Champion, error) {
+	rows, err := q.db.Query(ctx, listChampions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Champion
+	for rows.Next() {
+		var i Champion
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Title,
+			&i.ImgUrl,
+			&i.Version,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItems = `-- name: ListItems :many
+SELECT id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, version, updated_at FROM items ORDER BY id
+`
+
+func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
+	rows, err := q.db.Query(ctx, listItems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Item
+	for rows.Next() {
+		var i Item
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Plaintext,
+			&i.Type,
+			&i.GoldTotal,
+			&i.FromItems,
+			&i.IntoItems,
+			&i.IsSr,
+			&i.ImgUrl,
+			&i.Version,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertChampion = `-- name: UpsertChampion :exec
+INSERT INTO champions (id, slug, name, title, img_url, version)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET
+    slug       = EXCLUDED.slug,
+    name       = EXCLUDED.name,
+    title      = EXCLUDED.title,
+    img_url    = EXCLUDED.img_url,
+    version    = EXCLUDED.version,
+    updated_at = now()
+`
+
+type UpsertChampionParams struct {
+	ID      int32  `json:"id"`
+	Slug    string `json:"slug"`
+	Name    string `json:"name"`
+	Title   string `json:"title"`
+	ImgUrl  string `json:"imgUrl"`
+	Version string `json:"version"`
+}
+
+func (q *Queries) UpsertChampion(ctx context.Context, arg UpsertChampionParams) error {
+	_, err := q.db.Exec(ctx, upsertChampion,
+		arg.ID,
+		arg.Slug,
+		arg.Name,
+		arg.Title,
+		arg.ImgUrl,
+		arg.Version,
+	)
+	return err
+}
+
+const upsertItem = `-- name: UpsertItem :exec
+INSERT INTO items (id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (id) DO UPDATE SET
+    name       = EXCLUDED.name,
+    plaintext  = EXCLUDED.plaintext,
+    type       = EXCLUDED.type,
+    gold_total = EXCLUDED.gold_total,
+    from_items = EXCLUDED.from_items,
+    into_items = EXCLUDED.into_items,
+    is_sr      = EXCLUDED.is_sr,
+    img_url    = EXCLUDED.img_url,
+    version    = EXCLUDED.version,
+    updated_at = now()
+`
+
+type UpsertItemParams struct {
+	ID        int32   `json:"id"`
+	Name      string  `json:"name"`
+	Plaintext string  `json:"plaintext"`
+	Type      string  `json:"type"`
+	GoldTotal int32   `json:"goldTotal"`
+	FromItems []int32 `json:"fromItems"`
+	IntoItems []int32 `json:"intoItems"`
+	IsSr      bool    `json:"isSr"`
+	ImgUrl    string  `json:"imgUrl"`
+	Version   string  `json:"version"`
+}
+
+func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
+	_, err := q.db.Exec(ctx, upsertItem,
+		arg.ID,
+		arg.Name,
+		arg.Plaintext,
+		arg.Type,
+		arg.GoldTotal,
+		arg.FromItems,
+		arg.IntoItems,
+		arg.IsSr,
+		arg.ImgUrl,
+		arg.Version,
+	)
+	return err
 }
