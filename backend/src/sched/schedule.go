@@ -13,30 +13,30 @@ func StartEveryHour(a *app.Application) {
 	defer ticker.Stop()
 
 	fmt.Println("Schedule: EveryHour")
-	upsertLolData(a)
+	updateLolData(a)
 	for range ticker.C {
 		fmt.Println("Schedule: EveryHour")
-		upsertLolData(a)
+		updateLolData(a)
 	}
 }
 
-func upsertLolData(a *app.Application) {
+func updateLolData(a *app.Application) {
 	ctx := context.Background()
 	go func() {
-		err := a.UpsertChampions(ctx)
+		err := a.UpdateChampions(ctx)
 		if err != nil {
-			log.Println("UpsertChampions error:", err)
+			log.Println("UpdateChampions error:", err)
 		} else {
-			log.Println("UpsertChampions success")
+			log.Println("UpdateChampions success")
 		}
 		
 	}()
 	go func() {
-		err := a.UpsertItems(ctx)
+		err := a.UpdateItems(ctx)
 		if err != nil {
-			log.Println("UpsertItems error:", err)
+			log.Println("UpdateItems error:", err)
 		} else {
-			log.Println("UpsertChampions success")
+			log.Println("UpdateItems success")
 		}
 	}()
 }

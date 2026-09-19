@@ -107,7 +107,7 @@ func (a *Application) GetItems(ctx context.Context) ([]Item, error) {
 	return out, nil
 }
 
-func (a *Application) UpsertChampions(ctx context.Context) error {
+func (a *Application) UpdateChampions(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (a *Application) UpsertChampions(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
-func (a *Application) UpsertItems(ctx context.Context) error {
+func (a *Application) UpdateItems(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
