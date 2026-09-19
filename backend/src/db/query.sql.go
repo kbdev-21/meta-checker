@@ -12,9 +12,9 @@ import (
 )
 
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
-SELECT match_id, participant_id, team, is_win, player_id, riot_name, riot_tag, rank_power, champion_id, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
+SELECT match_id, team, is_win, player_id, riot_name, riot_tag, rank_power, champion_id, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
-ORDER BY match_id, participant_id
+ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id
 `
 
 func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds []string) ([]LolMatchParticipant, error) {
@@ -28,7 +28,6 @@ func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds [
 		var i LolMatchParticipant
 		if err := rows.Scan(
 			&i.MatchID,
-			&i.ParticipantID,
 			&i.Team,
 			&i.IsWin,
 			&i.PlayerID,
@@ -309,7 +308,7 @@ func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) error 
 
 const insertMatchParticipant = `-- name: InsertMatchParticipant :exec
 INSERT INTO lol_match_participants (
-    match_id, participant_id, team, is_win, player_id,
+    match_id, team, is_win, player_id,
     riot_name, riot_tag, rank_power,
     champion_id, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
@@ -322,14 +321,13 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
 )
-ON CONFLICT (match_id, participant_id) DO NOTHING
+ON CONFLICT (match_id, player_id) DO NOTHING
 `
 
 type InsertMatchParticipantParams struct {
 	MatchID              string      `json:"matchId"`
-	ParticipantID        int16       `json:"participantId"`
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
@@ -338,7 +336,7 @@ type InsertMatchParticipantParams struct {
 	RankPower            pgtype.Int4 `json:"rankPower"`
 	ChampionID           int32       `json:"championId"`
 	ChampLevel           int16       `json:"champLevel"`
-	Position             pgtype.Text `json:"position"`
+	Position             string      `json:"position"`
 	Kills                int16       `json:"kills"`
 	Deaths               int16       `json:"deaths"`
 	Assists              int16       `json:"assists"`
@@ -368,7 +366,6 @@ type InsertMatchParticipantParams struct {
 func (q *Queries) InsertMatchParticipant(ctx context.Context, arg InsertMatchParticipantParams) error {
 	_, err := q.db.Exec(ctx, insertMatchParticipant,
 		arg.MatchID,
-		arg.ParticipantID,
 		arg.Team,
 		arg.IsWin,
 		arg.PlayerID,

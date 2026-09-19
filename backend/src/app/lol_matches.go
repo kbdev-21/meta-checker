@@ -23,6 +23,17 @@ const (
 	LolGameModeNormal LolGameMode = "NORMAL" // còn lại
 )
 
+type LolPosition string
+
+const (
+	LolPositionTop LolPosition = "TOP" // Riot teamPosition TOP
+	LolPositionJgl LolPosition = "JGL" // JUNGLE
+	LolPositionMid LolPosition = "MID" // MIDDLE
+	LolPositionAdc LolPosition = "ADC" // BOTTOM
+	LolPositionSpt LolPosition = "SPT" // UTILITY
+	LolPositionUnk LolPosition = "UNK" // rỗng / giá trị lạ (ARAM, Arena...)
+)
+
 const (
 	queueRankedSolo = 420
 	queueRankedFlex = 440
@@ -83,45 +94,43 @@ func ToLolMatch(m db.LolMatch, participants []LolMatchParticipant) LolMatch {
 }
 
 type LolMatchParticipant struct {
-	ParticipantId        int16                   `json:"participantId"`
-	Team                 int16                   `json:"team"`
-	IsWin                bool                    `json:"isWin"`
-	PlayerId             string                  `json:"playerId"`
-	RiotName             string                  `json:"riotName"`
-	RiotTag              string                  `json:"riotTag"`
-	RankPower            shared.Nullable[int32]  `json:"rankPower"`
-	ChampionId           int32                   `json:"championId"`
-	ChampLevel           int16                   `json:"champLevel"`
-	Position             shared.Nullable[string] `json:"position"`
-	Kills                int16                   `json:"kills"`
-	Deaths               int16                   `json:"deaths"`
-	Assists              int16                   `json:"assists"`
-	Kda                  float32                 `json:"kda"`
-	KillParticipation    float32                 `json:"killParticipation"`
-	GoldEarned           int32                   `json:"goldEarned"`
-	MinionsKilled        int32                   `json:"minionsKilled"`
-	NeutralMinionsKilled int32                   `json:"neutralMinionsKilled"`
-	Cs                   int32                   `json:"cs"`
-	DmgToChamps          int32                   `json:"dmgToChamps"`
-	PhysicalDmgToChamps  int32                   `json:"physicalDmgToChamps"`
-	MagicDmgToChamps     int32                   `json:"magicDmgToChamps"`
-	TrueDmgToChamps      int32                   `json:"trueDmgToChamps"`
-	DmgTaken             int32                   `json:"dmgTaken"`
-	VisionScore          int32                   `json:"visionScore"`
-	PerfScore            int32                   `json:"perfScore"`
-	Spell1Id             int16                   `json:"spell1Id"`
-	Spell2Id             int16                   `json:"spell2Id"`
-	RunePrimaryStyle     int32                   `json:"runePrimaryStyle"`
-	RuneSubStyle         int32                   `json:"runeSubStyle"`
-	KeyRune              int32                   `json:"keyRune"`
-	Runes                []int32                 `json:"runes"`
-	StatRunes            []int32                 `json:"statRunes"`
-	Items                []int32                 `json:"items"`
+	Team                 int16                  `json:"team"`
+	IsWin                bool                   `json:"isWin"`
+	PlayerId             string                 `json:"playerId"`
+	RiotName             string                 `json:"riotName"`
+	RiotTag              string                 `json:"riotTag"`
+	RankPower            shared.Nullable[int32] `json:"rankPower"`
+	ChampionId           int32                  `json:"championId"`
+	ChampLevel           int16                  `json:"champLevel"`
+	Position             LolPosition            `json:"position"`
+	Kills                int16                  `json:"kills"`
+	Deaths               int16                  `json:"deaths"`
+	Assists              int16                  `json:"assists"`
+	Kda                  float32                `json:"kda"`
+	KillParticipation    float32                `json:"killParticipation"`
+	GoldEarned           int32                  `json:"goldEarned"`
+	MinionsKilled        int32                  `json:"minionsKilled"`
+	NeutralMinionsKilled int32                  `json:"neutralMinionsKilled"`
+	Cs                   int32                  `json:"cs"`
+	DmgToChamps          int32                  `json:"dmgToChamps"`
+	PhysicalDmgToChamps  int32                  `json:"physicalDmgToChamps"`
+	MagicDmgToChamps     int32                  `json:"magicDmgToChamps"`
+	TrueDmgToChamps      int32                  `json:"trueDmgToChamps"`
+	DmgTaken             int32                  `json:"dmgTaken"`
+	VisionScore          int32                  `json:"visionScore"`
+	PerfScore            int32                  `json:"perfScore"`
+	Spell1Id             int16                  `json:"spell1Id"`
+	Spell2Id             int16                  `json:"spell2Id"`
+	RunePrimaryStyle     int32                  `json:"runePrimaryStyle"`
+	RuneSubStyle         int32                  `json:"runeSubStyle"`
+	KeyRune              int32                  `json:"keyRune"`
+	Runes                []int32                `json:"runes"`
+	StatRunes            []int32                `json:"statRunes"`
+	Items                []int32                `json:"items"`
 }
 
 func ToLolMatchParticipant(p db.LolMatchParticipant) LolMatchParticipant {
 	return LolMatchParticipant{
-		ParticipantId:        p.ParticipantID,
 		Team:                 p.Team,
 		IsWin:                p.IsWin,
 		PlayerId:             p.PlayerID,
@@ -130,7 +139,7 @@ func ToLolMatchParticipant(p db.LolMatchParticipant) LolMatchParticipant {
 		RankPower:            shared.NullableInt4(p.RankPower),
 		ChampionId:           p.ChampionID,
 		ChampLevel:           p.ChampLevel,
-		Position:             shared.NullableText[string](p.Position),
+		Position:             LolPosition(p.Position),
 		Kills:                p.Kills,
 		Deaths:               p.Deaths,
 		Assists:              p.Assists,
@@ -341,6 +350,23 @@ func lolGameModeOf(queueId, mapId int) LolGameMode {
 	return LolGameModeNormal
 }
 
+// Riot teamPosition => LolPosition. Rỗng / giá trị lạ (ARAM, Arena...) => UNK.
+func lolPositionOf(teamPosition string) LolPosition {
+	switch teamPosition {
+	case "TOP":
+		return LolPositionTop
+	case "JUNGLE":
+		return LolPositionJgl
+	case "MIDDLE":
+		return LolPositionMid
+	case "BOTTOM":
+		return LolPositionAdc
+	case "UTILITY":
+		return LolPositionSpt
+	}
+	return LolPositionUnk
+}
+
 // Queue id Riot để lọc match theo mode. ok = false nếu mode không lọc được bằng 1 queue (ARAM, NORMAL).
 func riotQueueOf(mode LolGameMode) (queue int, ok bool) {
 	switch mode {
@@ -495,7 +521,6 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 
 	return db.InsertMatchParticipantParams{
 		MatchID:              matchId,
-		ParticipantID:        int16(p.ParticipantId),
 		Team:                 teamOf(p.TeamId),
 		IsWin:                p.Win,
 		PlayerID:             p.Puuid,
@@ -504,7 +529,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		RankPower:            shared.PgInt4(rankPower),
 		ChampionID:           int32(p.ChampionId),
 		ChampLevel:           int16(p.ChampLevel),
-		Position:             pgtype.Text{String: p.TeamPosition, Valid: p.TeamPosition != ""},
+		Position:             string(lolPositionOf(p.TeamPosition)),
 		Kills:                int16(p.Kills),
 		Deaths:               int16(p.Deaths),
 		Assists:              int16(p.Assists),

@@ -89,7 +89,6 @@ CREATE INDEX IF NOT EXISTS lol_matches_filter_idx ON lol_matches (patch, mode, g
 
 CREATE TABLE IF NOT EXISTS lol_match_participants (
     match_id               TEXT      NOT NULL REFERENCES lol_matches (id) ON DELETE CASCADE,
-    participant_id         SMALLINT  NOT NULL,         -- 1..10
     team                   SMALLINT  NOT NULL,         -- 1 = blue (Riot 100) | 2 = red (Riot 200)
     is_win                 BOOLEAN   NOT NULL,
     player_id              TEXT      NOT NULL,         -- puuid; KHÔNG FK tới lol_players vì không phải ai cũng được crawl
@@ -100,7 +99,7 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
 
     champion_id            INTEGER   NOT NULL,
     champ_level            SMALLINT  NOT NULL,
-    position               TEXT,                       -- teamPosition: TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY; NULL nếu rỗng
+    position               TEXT      NOT NULL,         -- TOP | JGL | MID | ADC | SPT (map từ teamPosition) | UNK nếu rỗng (ARAM...)
 
     kills                  SMALLINT  NOT NULL,
     deaths                 SMALLINT  NOT NULL,
@@ -134,7 +133,7 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
 
     items                  INTEGER[] NOT NULL,         -- đủ 7 phần tử item0..item6, giữ 0 cho slot rỗng; phần tử thứ 7 = trinket
 
-    PRIMARY KEY (match_id, participant_id)
+    PRIMARY KEY (match_id, player_id)
 );
 
 CREATE INDEX IF NOT EXISTS lol_match_participants_player_idx   ON lol_match_participants (player_id);

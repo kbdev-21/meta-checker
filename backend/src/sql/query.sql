@@ -96,7 +96,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- name: InsertMatchParticipant :exec
 INSERT INTO lol_match_participants (
-    match_id, participant_id, team, is_win, player_id,
+    match_id, team, is_win, player_id,
     riot_name, riot_tag, rank_power,
     champion_id, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
@@ -109,9 +109,9 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
 )
-ON CONFLICT (match_id, participant_id) DO NOTHING;
+ON CONFLICT (match_id, player_id) DO NOTHING;
 
 -- Bản batch của InsertMatch: pgx gửi cả list trong 1 round trip.
 -- name: InsertMatches :batchexec
@@ -128,7 +128,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Bản batch của InsertMatchParticipant.
 -- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
-    match_id, participant_id, team, is_win, player_id,
+    match_id, team, is_win, player_id,
     riot_name, riot_tag, rank_power,
     champion_id, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
@@ -141,9 +141,9 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
 )
-ON CONFLICT (match_id, participant_id) DO NOTHING;
+ON CONFLICT (match_id, player_id) DO NOTHING;
 
 -- Id không có trong DB thì bỏ qua.
 -- name: GetMatchesByIds :many
@@ -154,4 +154,4 @@ ORDER BY game_start_at DESC;
 -- name: GetMatchParticipantsByMatchIds :many
 SELECT * FROM lol_match_participants
 WHERE match_id = ANY(sqlc.arg(match_ids)::text[])
-ORDER BY match_id, participant_id;
+ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id;

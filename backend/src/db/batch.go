@@ -19,7 +19,7 @@ var (
 
 const insertMatchParticipants = `-- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
-    match_id, participant_id, team, is_win, player_id,
+    match_id, team, is_win, player_id,
     riot_name, riot_tag, rank_power,
     champion_id, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
@@ -32,9 +32,9 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
 )
-ON CONFLICT (match_id, participant_id) DO NOTHING
+ON CONFLICT (match_id, player_id) DO NOTHING
 `
 
 type InsertMatchParticipantsBatchResults struct {
@@ -45,7 +45,6 @@ type InsertMatchParticipantsBatchResults struct {
 
 type InsertMatchParticipantsParams struct {
 	MatchID              string      `json:"matchId"`
-	ParticipantID        int16       `json:"participantId"`
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
@@ -54,7 +53,7 @@ type InsertMatchParticipantsParams struct {
 	RankPower            pgtype.Int4 `json:"rankPower"`
 	ChampionID           int32       `json:"championId"`
 	ChampLevel           int16       `json:"champLevel"`
-	Position             pgtype.Text `json:"position"`
+	Position             string      `json:"position"`
 	Kills                int16       `json:"kills"`
 	Deaths               int16       `json:"deaths"`
 	Assists              int16       `json:"assists"`
@@ -87,7 +86,6 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 	for _, a := range arg {
 		vals := []interface{}{
 			a.MatchID,
-			a.ParticipantID,
 			a.Team,
 			a.IsWin,
 			a.PlayerID,

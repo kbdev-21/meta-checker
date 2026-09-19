@@ -56,7 +56,6 @@ type LolMatch struct {
 
 type LolMatchParticipant struct {
 	MatchID              string      `json:"matchId"`
-	ParticipantID        int16       `json:"participantId"`
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
@@ -65,7 +64,7 @@ type LolMatchParticipant struct {
 	RankPower            pgtype.Int4 `json:"rankPower"`
 	ChampionID           int32       `json:"championId"`
 	ChampLevel           int16       `json:"champLevel"`
-	Position             pgtype.Text `json:"position"`
+	Position             string      `json:"position"`
 	Kills                int16       `json:"kills"`
 	Deaths               int16       `json:"deaths"`
 	Assists              int16       `json:"assists"`
