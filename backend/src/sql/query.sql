@@ -67,8 +67,8 @@ ON CONFLICT (id) DO UPDATE SET
 SELECT * FROM players WHERE id = $1;
 
 -- Truyền vào name / tag đã normalize (chữ thường + trim).
--- name: GetPlayerByNameAndTag :one
-SELECT * FROM players WHERE normalized_name = sqlc.arg(normalized_name) AND normalized_tag = sqlc.arg(normalized_tag);
+-- name: GetPlayerByServerNameAndTag :one
+SELECT * FROM players WHERE server = sqlc.arg(server) AND normalized_name = sqlc.arg(normalized_name) AND normalized_tag = sqlc.arg(normalized_tag);
 
 -- name: SearchPlayers :many
 SELECT * FROM players

@@ -193,7 +193,8 @@ func (a *Application) GetPlayerById(ctx context.Context, id string) (shared.Null
 // Lỗi kỹ thuật (DB lỗi, Riot lỗi mà DB không có...) => err.
 func (a *Application) FindPlayerByNameAndTag(ctx context.Context, server RiotServer, name, tag string) (shared.Nullable[Player], error) {
 	cached := shared.Nullable[Player]{IsNull: true}
-	row, err := a.q.GetPlayerByNameAndTag(ctx, db.GetPlayerByNameAndTagParams{
+	row, err := a.q.GetPlayerByServerNameAndTag(ctx, db.GetPlayerByServerNameAndTagParams{
+		Server:         string(server),
 		NormalizedName: normalizeRiotId(name),
 		NormalizedTag:  normalizeRiotId(tag),
 	})

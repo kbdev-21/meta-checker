@@ -47,18 +47,19 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (Player, error) 
 	return i, err
 }
 
-const getPlayerByNameAndTag = `-- name: GetPlayerByNameAndTag :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE normalized_name = $1 AND normalized_tag = $2
+const getPlayerByServerNameAndTag = `-- name: GetPlayerByServerNameAndTag :one
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
 `
 
-type GetPlayerByNameAndTagParams struct {
+type GetPlayerByServerNameAndTagParams struct {
+	Server         string `json:"server"`
 	NormalizedName string `json:"normalizedName"`
 	NormalizedTag  string `json:"normalizedTag"`
 }
 
 // Truyền vào name / tag đã normalize (chữ thường + trim).
-func (q *Queries) GetPlayerByNameAndTag(ctx context.Context, arg GetPlayerByNameAndTagParams) (Player, error) {
-	row := q.db.QueryRow(ctx, getPlayerByNameAndTag, arg.NormalizedName, arg.NormalizedTag)
+func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayerByServerNameAndTagParams) (Player, error) {
+	row := q.db.QueryRow(ctx, getPlayerByServerNameAndTag, arg.Server, arg.NormalizedName, arg.NormalizedTag)
 	var i Player
 	err := row.Scan(
 		&i.ID,

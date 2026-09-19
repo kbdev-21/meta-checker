@@ -26,14 +26,17 @@ func upsertLolData(a *app.Application) {
 		err := a.UpsertChampions(ctx)
 		if err != nil {
 			log.Println("UpsertChampions error:", err)
+		} else {
+			log.Println("UpsertChampions success")
 		}
-		log.Println("UpsertChampions success")
+		
 	}()
 	go func() {
 		err := a.UpsertItems(ctx)
 		if err != nil {
 			log.Println("UpsertItems error:", err)
+		} else {
+			log.Println("UpsertChampions success")
 		}
-		log.Println("UpsertItems success")
 	}()
 }
