@@ -9,8 +9,12 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 )
+
+// Số match gọi song song mỗi lượt trong GetMatchesByIds, tránh bị rate limit.
+const matchFetchBatchSize = 5
 
 // region: americas | asia | europe | sea (account-v1, match-v5)
 // platform: vn2 | kr | na1 | euw1 | ... (league-v4, summoner-v4)
@@ -137,6 +141,30 @@ func (c *RiotClient) GetMatchIdsByPuuid(ctx context.Context, region, puuid strin
 func (c *RiotClient) GetMatch(ctx context.Context, region, matchId string) (*MatchDto, error) {
 	var out MatchDto
 	return &out, c.get(ctx, region, "/lol/match/v5/matches/"+matchId, nil, &out)
+}
+
+// Gọi GetMatch cho từng id, mỗi lượt matchFetchBatchSize goroutine song song.
+// Kết quả theo thứ tự matchIds. Có match lỗi => trả lỗi, bỏ cả kết quả.
+func (c *RiotClient) GetMatchesByIdsInParallel(ctx context.Context, region string, matchIds []string) ([]*MatchDto, error) {
+	out := make([]*MatchDto, 0, len(matchIds))
+	for start := 0; start < len(matchIds); start += matchFetchBatchSize {
+		batch := matchIds[start:min(start+matchFetchBatchSize, len(matchIds))]
+		fetched := make([]*MatchDto, len(batch))
+		errs := make([]error, len(batch))
+		var wg sync.WaitGroup
+		for i, id := range batch {
+			wg.Go(func() {
+				fetched[i], errs[i] = c.GetMatch(ctx, region, id)
+			})
+		}
+		wg.Wait()
+		err := errors.Join(errs...)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, fetched...)
+	}
+	return out, nil
 }
 
 func (c *RiotClient) GetMatchTimeline(ctx context.Context, region, matchId string) (*TimelineDto, error) {

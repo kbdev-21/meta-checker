@@ -11,13 +11,122 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getPlayerById = `-- name: GetPlayerById :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE id = $1
+const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
+SELECT match_id, participant_id, team, is_win, player_id, riot_name, riot_tag, rank_power, champion_id, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
+WHERE match_id = ANY($1::text[])
+ORDER BY match_id, participant_id
 `
 
-func (q *Queries) GetPlayerById(ctx context.Context, id string) (Player, error) {
+func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds []string) ([]LolMatchParticipant, error) {
+	rows, err := q.db.Query(ctx, getMatchParticipantsByMatchIds, matchIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LolMatchParticipant
+	for rows.Next() {
+		var i LolMatchParticipant
+		if err := rows.Scan(
+			&i.MatchID,
+			&i.ParticipantID,
+			&i.Team,
+			&i.IsWin,
+			&i.PlayerID,
+			&i.RiotName,
+			&i.RiotTag,
+			&i.RankPower,
+			&i.ChampionID,
+			&i.ChampLevel,
+			&i.Position,
+			&i.Kills,
+			&i.Deaths,
+			&i.Assists,
+			&i.Kda,
+			&i.KillParticipation,
+			&i.GoldEarned,
+			&i.MinionsKilled,
+			&i.NeutralMinionsKilled,
+			&i.Cs,
+			&i.DmgToChamps,
+			&i.PhysicalDmgToChamps,
+			&i.MagicDmgToChamps,
+			&i.TrueDmgToChamps,
+			&i.DmgTaken,
+			&i.VisionScore,
+			&i.PerfScore,
+			&i.Spell1ID,
+			&i.Spell2ID,
+			&i.RunePrimaryStyle,
+			&i.RuneSubStyle,
+			&i.KeyRune,
+			&i.Runes,
+			&i.StatRunes,
+			&i.Items,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMatchesByIds = `-- name: GetMatchesByIds :many
+SELECT id, server, mode, patch, game_start_at, duration_sec, is_remake, estimated_rank, banned_champion_ids, winning_team, team_1_kills, team_1_dragon_kills, team_1_herald_kills, team_1_baron_kills, team_2_kills, team_2_dragon_kills, team_2_herald_kills, team_2_baron_kills, created_at FROM lol_matches
+WHERE id = ANY($1::text[])
+ORDER BY game_start_at DESC
+`
+
+// Id không có trong DB thì bỏ qua.
+func (q *Queries) GetMatchesByIds(ctx context.Context, ids []string) ([]LolMatch, error) {
+	rows, err := q.db.Query(ctx, getMatchesByIds, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LolMatch
+	for rows.Next() {
+		var i LolMatch
+		if err := rows.Scan(
+			&i.ID,
+			&i.Server,
+			&i.Mode,
+			&i.Patch,
+			&i.GameStartAt,
+			&i.DurationSec,
+			&i.IsRemake,
+			&i.EstimatedRank,
+			&i.BannedChampionIds,
+			&i.WinningTeam,
+			&i.Team1Kills,
+			&i.Team1DragonKills,
+			&i.Team1HeraldKills,
+			&i.Team1BaronKills,
+			&i.Team2Kills,
+			&i.Team2DragonKills,
+			&i.Team2HeraldKills,
+			&i.Team2BaronKills,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPlayerById = `-- name: GetPlayerById :one
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = $1
+`
+
+func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, error) {
 	row := q.db.QueryRow(ctx, getPlayerById, id)
-	var i Player
+	var i LolPlayer
 	err := row.Scan(
 		&i.ID,
 		&i.Server,
@@ -48,7 +157,7 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (Player, error) 
 }
 
 const getPlayerByServerNameAndTag = `-- name: GetPlayerByServerNameAndTag :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
 `
 
 type GetPlayerByServerNameAndTagParams struct {
@@ -58,9 +167,9 @@ type GetPlayerByServerNameAndTagParams struct {
 }
 
 // Truyền vào name / tag đã normalize (chữ thường + trim).
-func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayerByServerNameAndTagParams) (Player, error) {
+func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayerByServerNameAndTagParams) (LolPlayer, error) {
 	row := q.db.QueryRow(ctx, getPlayerByServerNameAndTag, arg.Server, arg.NormalizedName, arg.NormalizedTag)
-	var i Player
+	var i LolPlayer
 	err := row.Scan(
 		&i.ID,
 		&i.Server,
@@ -90,26 +199,233 @@ func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayer
 	return i, err
 }
 
-const listChampions = `-- name: ListChampions :many
-SELECT id, slug, name, title, img_url, version, updated_at FROM champions ORDER BY name
+const getPlayersByIds = `-- name: GetPlayersByIds :many
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = ANY($1::text[])
 `
 
-func (q *Queries) ListChampions(ctx context.Context) ([]Champion, error) {
+// Id không có trong DB thì bỏ qua.
+func (q *Queries) GetPlayersByIds(ctx context.Context, ids []string) ([]LolPlayer, error) {
+	rows, err := q.db.Query(ctx, getPlayersByIds, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LolPlayer
+	for rows.Next() {
+		var i LolPlayer
+		if err := rows.Scan(
+			&i.ID,
+			&i.Server,
+			&i.Name,
+			&i.Tag,
+			&i.NormalizedName,
+			&i.NormalizedTag,
+			&i.ProfileIconID,
+			&i.SummonerLevel,
+			&i.SearchString,
+			&i.SoloRank,
+			&i.SoloTier,
+			&i.SoloLp,
+			&i.SoloRankPower,
+			&i.SoloWins,
+			&i.SoloLosses,
+			&i.FlexRank,
+			&i.FlexTier,
+			&i.FlexLp,
+			&i.FlexWins,
+			&i.FlexLosses,
+			&i.LastMatchAt,
+			&i.MatchesSyncedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertMatch = `-- name: InsertMatch :exec
+INSERT INTO lol_matches (
+    id, server, mode, patch, game_start_at, duration_sec, is_remake, estimated_rank,
+    banned_champion_ids,
+    winning_team,
+    team_1_kills, team_1_dragon_kills, team_1_herald_kills, team_1_baron_kills,
+    team_2_kills, team_2_dragon_kills, team_2_herald_kills, team_2_baron_kills
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertMatchParams struct {
+	ID                string             `json:"id"`
+	Server            string             `json:"server"`
+	Mode              string             `json:"mode"`
+	Patch             string             `json:"patch"`
+	GameStartAt       pgtype.Timestamptz `json:"gameStartAt"`
+	DurationSec       int32              `json:"durationSec"`
+	IsRemake          bool               `json:"isRemake"`
+	EstimatedRank     pgtype.Text        `json:"estimatedRank"`
+	BannedChampionIds []int32            `json:"bannedChampionIds"`
+	WinningTeam       int16              `json:"winningTeam"`
+	Team1Kills        int16              `json:"team1Kills"`
+	Team1DragonKills  int16              `json:"team1DragonKills"`
+	Team1HeraldKills  int16              `json:"team1HeraldKills"`
+	Team1BaronKills   int16              `json:"team1BaronKills"`
+	Team2Kills        int16              `json:"team2Kills"`
+	Team2DragonKills  int16              `json:"team2DragonKills"`
+	Team2HeraldKills  int16              `json:"team2HeraldKills"`
+	Team2BaronKills   int16              `json:"team2BaronKills"`
+}
+
+// Match đã kết thúc không đổi nên trùng id thì bỏ qua.
+func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) error {
+	_, err := q.db.Exec(ctx, insertMatch,
+		arg.ID,
+		arg.Server,
+		arg.Mode,
+		arg.Patch,
+		arg.GameStartAt,
+		arg.DurationSec,
+		arg.IsRemake,
+		arg.EstimatedRank,
+		arg.BannedChampionIds,
+		arg.WinningTeam,
+		arg.Team1Kills,
+		arg.Team1DragonKills,
+		arg.Team1HeraldKills,
+		arg.Team1BaronKills,
+		arg.Team2Kills,
+		arg.Team2DragonKills,
+		arg.Team2HeraldKills,
+		arg.Team2BaronKills,
+	)
+	return err
+}
+
+const insertMatchParticipant = `-- name: InsertMatchParticipant :exec
+INSERT INTO lol_match_participants (
+    match_id, participant_id, team, is_win, player_id,
+    riot_name, riot_tag, rank_power,
+    champion_id, champ_level, position,
+    kills, deaths, assists, kda, kill_participation,
+    gold_earned, minions_killed, neutral_minions_killed, cs,
+    dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
+    perf_score,
+    spell1_id, spell2_id,
+    rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
+    items
+)
+VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+)
+ON CONFLICT (match_id, participant_id) DO NOTHING
+`
+
+type InsertMatchParticipantParams struct {
+	MatchID              string      `json:"matchId"`
+	ParticipantID        int16       `json:"participantId"`
+	Team                 int16       `json:"team"`
+	IsWin                bool        `json:"isWin"`
+	PlayerID             string      `json:"playerId"`
+	RiotName             string      `json:"riotName"`
+	RiotTag              string      `json:"riotTag"`
+	RankPower            pgtype.Int4 `json:"rankPower"`
+	ChampionID           int32       `json:"championId"`
+	ChampLevel           int16       `json:"champLevel"`
+	Position             pgtype.Text `json:"position"`
+	Kills                int16       `json:"kills"`
+	Deaths               int16       `json:"deaths"`
+	Assists              int16       `json:"assists"`
+	Kda                  float32     `json:"kda"`
+	KillParticipation    float32     `json:"killParticipation"`
+	GoldEarned           int32       `json:"goldEarned"`
+	MinionsKilled        int32       `json:"minionsKilled"`
+	NeutralMinionsKilled int32       `json:"neutralMinionsKilled"`
+	Cs                   int32       `json:"cs"`
+	DmgToChamps          int32       `json:"dmgToChamps"`
+	PhysicalDmgToChamps  int32       `json:"physicalDmgToChamps"`
+	MagicDmgToChamps     int32       `json:"magicDmgToChamps"`
+	TrueDmgToChamps      int32       `json:"trueDmgToChamps"`
+	DmgTaken             int32       `json:"dmgTaken"`
+	VisionScore          int32       `json:"visionScore"`
+	PerfScore            int32       `json:"perfScore"`
+	Spell1ID             int16       `json:"spell1Id"`
+	Spell2ID             int16       `json:"spell2Id"`
+	RunePrimaryStyle     int32       `json:"runePrimaryStyle"`
+	RuneSubStyle         int32       `json:"runeSubStyle"`
+	KeyRune              int32       `json:"keyRune"`
+	Runes                []int32     `json:"runes"`
+	StatRunes            []int32     `json:"statRunes"`
+	Items                []int32     `json:"items"`
+}
+
+func (q *Queries) InsertMatchParticipant(ctx context.Context, arg InsertMatchParticipantParams) error {
+	_, err := q.db.Exec(ctx, insertMatchParticipant,
+		arg.MatchID,
+		arg.ParticipantID,
+		arg.Team,
+		arg.IsWin,
+		arg.PlayerID,
+		arg.RiotName,
+		arg.RiotTag,
+		arg.RankPower,
+		arg.ChampionID,
+		arg.ChampLevel,
+		arg.Position,
+		arg.Kills,
+		arg.Deaths,
+		arg.Assists,
+		arg.Kda,
+		arg.KillParticipation,
+		arg.GoldEarned,
+		arg.MinionsKilled,
+		arg.NeutralMinionsKilled,
+		arg.Cs,
+		arg.DmgToChamps,
+		arg.PhysicalDmgToChamps,
+		arg.MagicDmgToChamps,
+		arg.TrueDmgToChamps,
+		arg.DmgTaken,
+		arg.VisionScore,
+		arg.PerfScore,
+		arg.Spell1ID,
+		arg.Spell2ID,
+		arg.RunePrimaryStyle,
+		arg.RuneSubStyle,
+		arg.KeyRune,
+		arg.Runes,
+		arg.StatRunes,
+		arg.Items,
+	)
+	return err
+}
+
+const listChampions = `-- name: ListChampions :many
+SELECT id, slug, name, title, img_url, patch, updated_at FROM lol_champions ORDER BY name
+`
+
+func (q *Queries) ListChampions(ctx context.Context) ([]LolChampion, error) {
 	rows, err := q.db.Query(ctx, listChampions)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Champion
+	var items []LolChampion
 	for rows.Next() {
-		var i Champion
+		var i LolChampion
 		if err := rows.Scan(
 			&i.ID,
 			&i.Slug,
 			&i.Name,
 			&i.Title,
 			&i.ImgUrl,
-			&i.Version,
+			&i.Patch,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -123,18 +439,18 @@ func (q *Queries) ListChampions(ctx context.Context) ([]Champion, error) {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, version, updated_at FROM items ORDER BY id
+SELECT id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, patch, updated_at FROM lol_items ORDER BY id
 `
 
-func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
+func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
 	rows, err := q.db.Query(ctx, listItems)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Item
+	var items []LolItem
 	for rows.Next() {
-		var i Item
+		var i LolItem
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -145,7 +461,7 @@ func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
 			&i.IntoItems,
 			&i.IsSr,
 			&i.ImgUrl,
-			&i.Version,
+			&i.Patch,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -159,7 +475,7 @@ func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
 }
 
 const searchPlayers = `-- name: SearchPlayers :many
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM players
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players
 WHERE name ILIKE '%' || $1::text || '%'
    OR tag ILIKE '%' || $1::text || '%'
    OR search_string LIKE '%' || $2::text || '%'
@@ -173,15 +489,15 @@ type SearchPlayersParams struct {
 	Lim               int32  `json:"lim"`
 }
 
-func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([]Player, error) {
+func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([]LolPlayer, error) {
 	rows, err := q.db.Query(ctx, searchPlayers, arg.Keyword, arg.NormalizedKeyword, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Player
+	var items []LolPlayer
 	for rows.Next() {
-		var i Player
+		var i LolPlayer
 		if err := rows.Scan(
 			&i.ID,
 			&i.Server,
@@ -219,24 +535,24 @@ func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([
 }
 
 const upsertChampion = `-- name: UpsertChampion :exec
-INSERT INTO champions (id, slug, name, title, img_url, version)
+INSERT INTO lol_champions (id, slug, name, title, img_url, patch)
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (id) DO UPDATE SET
     slug       = EXCLUDED.slug,
     name       = EXCLUDED.name,
     title      = EXCLUDED.title,
     img_url    = EXCLUDED.img_url,
-    version    = EXCLUDED.version,
+    patch      = EXCLUDED.patch,
     updated_at = now()
 `
 
 type UpsertChampionParams struct {
-	ID      int32  `json:"id"`
-	Slug    string `json:"slug"`
-	Name    string `json:"name"`
-	Title   string `json:"title"`
-	ImgUrl  string `json:"imgUrl"`
-	Version string `json:"version"`
+	ID     int32  `json:"id"`
+	Slug   string `json:"slug"`
+	Name   string `json:"name"`
+	Title  string `json:"title"`
+	ImgUrl string `json:"imgUrl"`
+	Patch  string `json:"patch"`
 }
 
 func (q *Queries) UpsertChampion(ctx context.Context, arg UpsertChampionParams) error {
@@ -246,13 +562,13 @@ func (q *Queries) UpsertChampion(ctx context.Context, arg UpsertChampionParams) 
 		arg.Name,
 		arg.Title,
 		arg.ImgUrl,
-		arg.Version,
+		arg.Patch,
 	)
 	return err
 }
 
 const upsertItem = `-- name: UpsertItem :exec
-INSERT INTO items (id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, version)
+INSERT INTO lol_items (id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, patch)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE SET
     name       = EXCLUDED.name,
@@ -263,7 +579,7 @@ ON CONFLICT (id) DO UPDATE SET
     into_items = EXCLUDED.into_items,
     is_sr      = EXCLUDED.is_sr,
     img_url    = EXCLUDED.img_url,
-    version    = EXCLUDED.version,
+    patch      = EXCLUDED.patch,
     updated_at = now()
 `
 
@@ -277,7 +593,7 @@ type UpsertItemParams struct {
 	IntoItems []int32 `json:"intoItems"`
 	IsSr      bool    `json:"isSr"`
 	ImgUrl    string  `json:"imgUrl"`
-	Version   string  `json:"version"`
+	Patch     string  `json:"patch"`
 }
 
 func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
@@ -291,13 +607,13 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
 		arg.IntoItems,
 		arg.IsSr,
 		arg.ImgUrl,
-		arg.Version,
+		arg.Patch,
 	)
 	return err
 }
 
 const upsertPlayer = `-- name: UpsertPlayer :exec
-INSERT INTO players (
+INSERT INTO lol_players (
     id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string,
     solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses,
     flex_rank, flex_tier, flex_lp, flex_wins, flex_losses
@@ -309,22 +625,22 @@ ON CONFLICT (id) DO UPDATE SET
     tag             = EXCLUDED.tag,
     normalized_name = EXCLUDED.normalized_name,
     normalized_tag  = EXCLUDED.normalized_tag,
-    profile_icon_id = COALESCE(EXCLUDED.profile_icon_id, players.profile_icon_id),
-    summoner_level  = COALESCE(EXCLUDED.summoner_level, players.summoner_level),
+    profile_icon_id = COALESCE(EXCLUDED.profile_icon_id, lol_players.profile_icon_id),
+    summoner_level  = COALESCE(EXCLUDED.summoner_level, lol_players.summoner_level),
     search_string   = EXCLUDED.search_string,
 
-    solo_rank       = COALESCE(EXCLUDED.solo_rank, players.solo_rank),
-    solo_tier       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_tier       ELSE EXCLUDED.solo_tier       END,
-    solo_lp         = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_lp         ELSE EXCLUDED.solo_lp         END,
-    solo_rank_power = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_rank_power ELSE EXCLUDED.solo_rank_power END,
-    solo_wins       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_wins       ELSE EXCLUDED.solo_wins       END,
-    solo_losses     = CASE WHEN EXCLUDED.solo_rank IS NULL THEN players.solo_losses     ELSE EXCLUDED.solo_losses     END,
+    solo_rank       = COALESCE(EXCLUDED.solo_rank, lol_players.solo_rank),
+    solo_tier       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN lol_players.solo_tier       ELSE EXCLUDED.solo_tier       END,
+    solo_lp         = CASE WHEN EXCLUDED.solo_rank IS NULL THEN lol_players.solo_lp         ELSE EXCLUDED.solo_lp         END,
+    solo_rank_power = CASE WHEN EXCLUDED.solo_rank IS NULL THEN lol_players.solo_rank_power ELSE EXCLUDED.solo_rank_power END,
+    solo_wins       = CASE WHEN EXCLUDED.solo_rank IS NULL THEN lol_players.solo_wins       ELSE EXCLUDED.solo_wins       END,
+    solo_losses     = CASE WHEN EXCLUDED.solo_rank IS NULL THEN lol_players.solo_losses     ELSE EXCLUDED.solo_losses     END,
 
-    flex_rank       = COALESCE(EXCLUDED.flex_rank, players.flex_rank),
-    flex_tier       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_tier   ELSE EXCLUDED.flex_tier   END,
-    flex_lp         = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_lp     ELSE EXCLUDED.flex_lp     END,
-    flex_wins       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_wins   ELSE EXCLUDED.flex_wins   END,
-    flex_losses     = CASE WHEN EXCLUDED.flex_rank IS NULL THEN players.flex_losses ELSE EXCLUDED.flex_losses END,
+    flex_rank       = COALESCE(EXCLUDED.flex_rank, lol_players.flex_rank),
+    flex_tier       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN lol_players.flex_tier   ELSE EXCLUDED.flex_tier   END,
+    flex_lp         = CASE WHEN EXCLUDED.flex_rank IS NULL THEN lol_players.flex_lp     ELSE EXCLUDED.flex_lp     END,
+    flex_wins       = CASE WHEN EXCLUDED.flex_rank IS NULL THEN lol_players.flex_wins   ELSE EXCLUDED.flex_wins   END,
+    flex_losses     = CASE WHEN EXCLUDED.flex_rank IS NULL THEN lol_players.flex_losses ELSE EXCLUDED.flex_losses END,
 
     updated_at      = now()
 `

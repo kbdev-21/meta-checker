@@ -23,20 +23,20 @@ func StartEveryHour(a *app.Application) {
 func updateLolData(a *app.Application) {
 	ctx := context.Background()
 	go func() {
-		err := a.UpdateChampions(ctx)
+		err := a.UpdateLolChampions(ctx)
 		if err != nil {
-			log.Println("UpdateChampions error:", err)
+			log.Println("UpdateLolChampions error:", err)
 		} else {
-			log.Println("UpdateChampions success")
+			log.Println("UpdateLolChampions success")
 		}
 		
 	}()
 	go func() {
-		err := a.UpdateItems(ctx)
+		err := a.UpdateLolItems(ctx)
 		if err != nil {
-			log.Println("UpdateItems error:", err)
+			log.Println("UpdateLolItems error:", err)
 		} else {
-			log.Println("UpdateItems success")
+			log.Println("UpdateLolItems success")
 		}
 	}()
 }

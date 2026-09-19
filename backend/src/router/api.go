@@ -3,15 +3,23 @@ package router
 import (
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"backend/src/app"
 	"backend/src/external"
+	"backend/src/shared"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 const playerSearchLimit = 20
+
+// count mặc định / tối đa cho list match; giới hạn để 1 request không gọi Riot quá nhiều.
+const (
+	matchListDefaultCount = 20
+	matchListMaxCount     = 20
+)
 
 func InitApiRoutes(fib *fiber.App, a *app.Application) {
 	fib.Get("/api/hello", helloApiHandler())
@@ -22,6 +30,8 @@ func InitApiRoutes(fib *fiber.App, a *app.Application) {
 	fib.Get("/api/lol/players", searchPlayersApiHandler(a))
 	fib.Get("/api/lol/players/by-info/:server/:name/:tag", findPlayerByInfoApiHandler(a))
 	fib.Post("/api/lol/players/by-info/:server/:name/:tag/update", updatePlayerByInfoApiHandler(a))
+
+	fib.Get("/api/lol/matches/by-player-info/:server/:name/:tag", getMatchesByPlayerInfoApiHandler(a))
 }
 
 func helloApiHandler() func(ctx fiber.Ctx) error {
@@ -32,7 +42,7 @@ func helloApiHandler() func(ctx fiber.Ctx) error {
 
 func getChampionsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		champs, err := a.GetChampions(ctx.Context())
+		champs, err := a.GetLolChampions(ctx.Context())
 		if err != nil {
 			log.Printf("get champions: %v", err)
 			return err
@@ -43,7 +53,7 @@ func getChampionsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 
 func getItemsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		items, err := a.GetItems(ctx.Context())
+		items, err := a.GetLolItems(ctx.Context())
 		if err != nil {
 			log.Printf("get items: %v", err)
 			return err
@@ -55,7 +65,7 @@ func getItemsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 // GET /api/lol/players?q=...
 func searchPlayersApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		players, err := a.SearchPlayers(ctx.Context(), ctx.Query("q"), playerSearchLimit)
+		players, err := a.SearchLolPlayers(ctx.Context(), ctx.Query("q"), playerSearchLimit)
 		if err != nil {
 			log.Printf("search players: %v", err)
 			return err
@@ -73,7 +83,7 @@ func findPlayerByInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 			return err
 		}
 
-		player, err := a.FindPlayerByNameAndTag(ctx.Context(), server, name, tag)
+		player, err := a.FindLolPlayerByPlayerInfo(ctx.Context(), server, name, tag)
 		if err != nil {
 			log.Printf("find player %s/%s#%s: %v", server, name, tag, err)
 			return err
@@ -94,7 +104,7 @@ func updatePlayerByInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error 
 			return err
 		}
 
-		_, err = a.UpdatePlayerByNameAndTag(ctx.Context(), server, name, tag)
+		_, err = a.UpdateLolPlayerByPlayerInfo(ctx.Context(), server, name, tag)
 		if external.IsRiotNotFound(err) {
 			return ctx.SendStatus(fiber.StatusNotFound)
 		}
@@ -103,6 +113,31 @@ func updatePlayerByInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error 
 			return err
 		}
 		return ctx.SendStatus(fiber.StatusNoContent)
+	}
+}
+
+// GET /api/lol/matches/by-player-info/:server/:name/:tag?mode=SOLO|FLEX&start=0&count=20
+// mode optional, không phân biệt hoa thường. Không tìm thấy player => 404.
+func getMatchesByPlayerInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
+		server, name, tag, err := playerInfoParams(ctx)
+		if err != nil {
+			return err
+		}
+		mode, start, count, err := matchListParams(ctx)
+		if err != nil {
+			return err
+		}
+
+		matches, err := a.GetLolMatchesByPlayerInfo(ctx.Context(), server, name, tag, mode, start, count)
+		if err != nil {
+			log.Printf("get matches %s/%s#%s: %v", server, name, tag, err)
+			return err
+		}
+		if matches.IsNull {
+			return ctx.SendStatus(fiber.StatusNotFound)
+		}
+		return ctx.JSON(matches.Value)
 	}
 }
 
@@ -124,4 +159,26 @@ func playerInfoParams(ctx fiber.Ctx) (server app.RiotServer, name, tag string, e
 		return "", "", "", fiber.NewError(fiber.StatusBadRequest, "invalid tag")
 	}
 	return server, name, tag, nil
+}
+
+// Đọc ?mode&start&count. Input sai => *fiber.Error 400.
+func matchListParams(ctx fiber.Ctx) (mode shared.Nullable[app.LolGameMode], start, count int, err error) {
+	mode = shared.Nullable[app.LolGameMode]{IsNull: true}
+	if q := ctx.Query("mode"); q != "" {
+		m := app.LolGameMode(strings.ToUpper(q))
+		if m != app.LolGameModeSolo && m != app.LolGameModeFlex {
+			return mode, 0, 0, fiber.NewError(fiber.StatusBadRequest, "invalid mode")
+		}
+		mode = shared.Nullable[app.LolGameMode]{Value: m}
+	}
+
+	start, err = strconv.Atoi(ctx.Query("start", "0"))
+	if err != nil || start < 0 {
+		return mode, 0, 0, fiber.NewError(fiber.StatusBadRequest, "invalid start")
+	}
+	count, err = strconv.Atoi(ctx.Query("count", strconv.Itoa(matchListDefaultCount)))
+	if err != nil || count < 1 || count > matchListMaxCount {
+		return mode, 0, 0, fiber.NewError(fiber.StatusBadRequest, "invalid count")
+	}
+	return mode, start, count, nil
 }

@@ -113,12 +113,12 @@ const (
 	rankPowerPerTier = 100
 )
 
-// FindPlayerByNameAndTag không gọi Riot nếu player vừa update trong khoảng này.
+// FindLolPlayerByPlayerInfo không gọi Riot nếu player vừa update trong khoảng này.
 const playerUpdateInterval = 2 * time.Minute
 
 // ---------- entity ----------
 
-type Player struct {
+type LolPlayer struct {
 	Id              string                     `json:"id"`
 	Server          RiotServer                 `json:"server"`
 	Name            string                     `json:"name"`
@@ -142,8 +142,8 @@ type Player struct {
 	UpdatedAt       time.Time                  `json:"updatedAt"`
 }
 
-func ToPlayer(p db.Player) Player {
-	return Player{
+func ToLolPlayer(p db.LolPlayer) LolPlayer {
+	return LolPlayer{
 		Id:              p.ID,
 		Server:          RiotServer(p.Server),
 		Name:            p.Name,
@@ -176,53 +176,53 @@ func (s RiotServer) IsValid() bool {
 }
 
 // Không tìm thấy => IsNull = true.
-func (a *Application) GetPlayerById(ctx context.Context, id string) (shared.Nullable[Player], error) {
+func (a *Application) GetLolPlayerById(ctx context.Context, id string) (shared.Nullable[LolPlayer], error) {
 	row, err := a.q.GetPlayerById(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return shared.Nullable[Player]{IsNull: true}, nil
+		return shared.Nullable[LolPlayer]{IsNull: true}, nil
 	}
 	if err != nil {
-		return shared.Nullable[Player]{}, err
+		return shared.Nullable[LolPlayer]{}, err
 	}
-	return shared.Nullable[Player]{Value: ToPlayer(row)}, nil
+	return shared.Nullable[LolPlayer]{Value: ToLolPlayer(row)}, nil
 }
 
 // Đọc DB trước: player vừa update trong playerUpdateInterval thì trả luôn, không gọi Riot.
 // Ngược lại update từ Riot; update lỗi thì trả bản đang có trong DB.
 // Không tìm thấy player (Riot 404 và DB không có) => IsNull = true, err = nil.
 // Lỗi kỹ thuật (DB lỗi, Riot lỗi mà DB không có...) => err.
-func (a *Application) FindPlayerByNameAndTag(ctx context.Context, server RiotServer, name, tag string) (shared.Nullable[Player], error) {
-	cached := shared.Nullable[Player]{IsNull: true}
+func (a *Application) FindLolPlayerByPlayerInfo(ctx context.Context, server RiotServer, name, tag string) (shared.Nullable[LolPlayer], error) {
+	cached := shared.Nullable[LolPlayer]{IsNull: true}
 	row, err := a.q.GetPlayerByServerNameAndTag(ctx, db.GetPlayerByServerNameAndTagParams{
 		Server:         string(server),
 		NormalizedName: normalizeRiotId(name),
 		NormalizedTag:  normalizeRiotId(tag),
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return shared.Nullable[Player]{}, err
+		return shared.Nullable[LolPlayer]{}, err
 	}
 	if err == nil {
-		cached = shared.Nullable[Player]{Value: ToPlayer(row)}
+		cached = shared.Nullable[LolPlayer]{Value: ToLolPlayer(row)}
 		if time.Since(cached.Value.UpdatedAt) < playerUpdateInterval {
 			return cached, nil
 		}
 	}
 
-	player, updateErr := a.UpdatePlayerByNameAndTag(ctx, server, name, tag)
+	player, updateErr := a.UpdateLolPlayerByPlayerInfo(ctx, server, name, tag)
 	if updateErr == nil {
-		return shared.Nullable[Player]{Value: player}, nil
+		return shared.Nullable[LolPlayer]{Value: player}, nil
 	}
 	if !cached.IsNull {
 		return cached, nil
 	}
 	if external.IsRiotNotFound(updateErr) {
-		return shared.Nullable[Player]{IsNull: true}, nil
+		return shared.Nullable[LolPlayer]{IsNull: true}, nil
 	}
-	return shared.Nullable[Player]{}, updateErr
+	return shared.Nullable[LolPlayer]{}, updateErr
 }
 
 // Tìm keyword trong name, tag và search_string (đã bỏ dấu). Sắp xếp theo solo rank power giảm dần.
-func (a *Application) SearchPlayers(ctx context.Context, keyword string, limit int32) ([]Player, error) {
+func (a *Application) SearchLolPlayers(ctx context.Context, keyword string, limit int32) ([]LolPlayer, error) {
 	keyword = strings.TrimSpace(keyword)
 	rows, err := a.q.SearchPlayers(ctx, db.SearchPlayersParams{
 		Keyword:           keyword,
@@ -232,25 +232,25 @@ func (a *Application) SearchPlayers(ctx context.Context, keyword string, limit i
 	if err != nil {
 		return nil, err
 	}
-	out := []Player{}
+	out := []LolPlayer{}
 	for _, r := range rows {
-		out = append(out, ToPlayer(r))
+		out = append(out, ToLolPlayer(r))
 	}
 	return out, nil
 }
 
 // Lấy account (account-v1), summoner (summoner-v4), rank solo/flex (league-v4) từ Riot rồi upsert vào DB.
 // Queue nào không có entry thì là UNRANKED.
-func (a *Application) UpdatePlayerByNameAndTag(ctx context.Context, server RiotServer, name, tag string) (Player, error) {
+func (a *Application) UpdateLolPlayerByPlayerInfo(ctx context.Context, server RiotServer, name, tag string) (LolPlayer, error) {
 	regions, ok := serverRegions[server]
 	if !ok {
-		return Player{}, fmt.Errorf("invalid server: %q", server)
+		return LolPlayer{}, fmt.Errorf("invalid server: %q", server)
 	}
 	platform := strings.ToLower(string(server))
 
 	account, err := a.riot.GetAccountByRiotId(ctx, regions.account, name, tag)
 	if err != nil {
-		return Player{}, err
+		return LolPlayer{}, err
 	}
 	// summoner và league chỉ cần puuid, không phụ thuộc nhau => gọi song song.
 	var (
@@ -269,7 +269,7 @@ func (a *Application) UpdatePlayerByNameAndTag(ctx context.Context, server RiotS
 	wg.Wait()
 	err = errors.Join(summonerErr, entriesErr)
 	if err != nil {
-		return Player{}, err
+		return LolPlayer{}, err
 	}
 
 	solo := queueRankOf(entries, external.QueueRankedSolo)
@@ -302,16 +302,16 @@ func (a *Application) UpdatePlayerByNameAndTag(ctx context.Context, server RiotS
 		FlexLosses: flex.losses,
 	})
 	if err != nil {
-		return Player{}, err
+		return LolPlayer{}, err
 	}
 
 	// Vừa upsert xong nên luôn có; không có là lỗi.
-	player, err := a.GetPlayerById(ctx, account.Puuid)
+	player, err := a.GetLolPlayerById(ctx, account.Puuid)
 	if err != nil {
-		return Player{}, err
+		return LolPlayer{}, err
 	}
 	if player.IsNull {
-		return Player{}, fmt.Errorf("player %s not found after upsert", account.Puuid)
+		return LolPlayer{}, fmt.Errorf("player %s not found after upsert", account.Puuid)
 	}
 	return player.Value, nil
 }

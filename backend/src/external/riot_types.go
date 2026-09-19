@@ -133,12 +133,17 @@ type ParticipantDto struct {
 	Deaths  int `json:"deaths"`
 	Assists int `json:"assists"`
 
-	GoldEarned                  int `json:"goldEarned"`
-	TotalMinionsKilled          int `json:"totalMinionsKilled"`
-	NeutralMinionsKilled        int `json:"neutralMinionsKilled"`
-	TotalDamageDealtToChampions int `json:"totalDamageDealtToChampions"`
-	TotalDamageTaken            int `json:"totalDamageTaken"`
-	VisionScore                 int `json:"visionScore"`
+	GoldEarned                     int `json:"goldEarned"`
+	TotalMinionsKilled             int `json:"totalMinionsKilled"`
+	NeutralMinionsKilled           int `json:"neutralMinionsKilled"`
+	TotalDamageDealtToChampions    int `json:"totalDamageDealtToChampions"`
+	PhysicalDamageDealtToChampions int `json:"physicalDamageDealtToChampions"`
+	MagicDamageDealtToChampions    int `json:"magicDamageDealtToChampions"`
+	TrueDamageDealtToChampions     int `json:"trueDamageDealtToChampions"`
+	TotalDamageTaken               int `json:"totalDamageTaken"`
+	VisionScore                    int `json:"visionScore"`
+
+	GameEndedInEarlySurrender bool `json:"gameEndedInEarlySurrender"` // remake
 
 	Item0 int `json:"item0"`
 	Item1 int `json:"item1"`

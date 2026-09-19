@@ -36,3 +36,12 @@ func NormalizeString(s string) string {
 	}
 	return strings.TrimSpace(out)
 }
+
+// Cắt version về dạng patch "major.minor", vd "16.18.712.3456" (game) / "16.18.1" (ddragon) => "16.18".
+func PatchOf(version string) string {
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) < 2 {
+		return version
+	}
+	return parts[0] + "." + parts[1]
+}

@@ -29,29 +29,29 @@ const (
 
 // ---------- entity ----------
 
-type Champion struct {
+type LolChampion struct {
 	Id        int32     `json:"id"`
 	Slug      string    `json:"slug"`
 	Name      string    `json:"name"`
 	Title     string    `json:"title"`
 	ImgUrl    string    `json:"imgUrl"`
-	Version   string    `json:"version"`
+	Patch     string    `json:"patch"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func ToChampion(c db.Champion) Champion {
-	return Champion{
+func ToLolChampion(c db.LolChampion) LolChampion {
+	return LolChampion{
 		Id:        c.ID,
 		Slug:      c.Slug,
 		Name:      c.Name,
 		Title:     c.Title,
 		ImgUrl:    c.ImgUrl,
-		Version:   c.Version,
+		Patch:     c.Patch,
 		UpdatedAt: c.UpdatedAt.Time,
 	}
 }
 
-type Item struct {
+type LolItem struct {
 	Id        int32     `json:"id"`
 	Name      string    `json:"name"`
 	Plaintext string    `json:"plaintext"`
@@ -61,12 +61,12 @@ type Item struct {
 	IntoItems []int32   `json:"intoItems"`
 	IsSr      bool      `json:"isSr"`
 	ImgUrl    string    `json:"imgUrl"`
-	Version   string    `json:"version"`
+	Patch     string    `json:"patch"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func ToItem(i db.Item) Item {
-	return Item{
+func ToLolItem(i db.LolItem) LolItem {
+	return LolItem{
 		Id:        i.ID,
 		Name:      i.Name,
 		Plaintext: i.Plaintext,
@@ -76,38 +76,38 @@ func ToItem(i db.Item) Item {
 		IntoItems: i.IntoItems,
 		IsSr:      i.IsSr,
 		ImgUrl:    i.ImgUrl,
-		Version:   i.Version,
+		Patch:     i.Patch,
 		UpdatedAt: i.UpdatedAt.Time,
 	}
 }
 
 // ---------- logic ----------
 
-func (a *Application) GetChampions(ctx context.Context) ([]Champion, error) {
+func (a *Application) GetLolChampions(ctx context.Context) ([]LolChampion, error) {
 	rows, err := a.q.ListChampions(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []Champion{}
+	out := []LolChampion{}
 	for _, r := range rows {
-		out = append(out, ToChampion(r))
+		out = append(out, ToLolChampion(r))
 	}
 	return out, nil
 }
 
-func (a *Application) GetItems(ctx context.Context) ([]Item, error) {
+func (a *Application) GetLolItems(ctx context.Context) ([]LolItem, error) {
 	rows, err := a.q.ListItems(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []Item{}
+	out := []LolItem{}
 	for _, r := range rows {
-		out = append(out, ToItem(r))
+		out = append(out, ToLolItem(r))
 	}
 	return out, nil
 }
 
-func (a *Application) UpdateChampions(ctx context.Context) error {
+func (a *Application) UpdateLolChampions(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
@@ -130,12 +130,12 @@ func (a *Application) UpdateChampions(ctx context.Context) error {
 			return err
 		}
 		err = q.UpsertChampion(ctx, db.UpsertChampionParams{
-			ID:      int32(id),
-			Slug:    c.Id,
-			Name:    c.Name,
-			Title:   c.Title,
-			ImgUrl:  external.DDImgUrl(version, c.Image),
-			Version: version,
+			ID:     int32(id),
+			Slug:   c.Id,
+			Name:   c.Name,
+			Title:  c.Title,
+			ImgUrl: external.DDImgUrl(version, c.Image),
+			Patch:  shared.PatchOf(version),
 		})
 		if err != nil {
 			return err
@@ -144,7 +144,7 @@ func (a *Application) UpdateChampions(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
-func (a *Application) UpdateItems(ctx context.Context) error {
+func (a *Application) UpdateLolItems(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (a *Application) UpdateItems(ctx context.Context) error {
 			IntoItems: into,
 			IsSr:      it.Maps["11"],
 			ImgUrl:    external.DDImgUrl(version, it.Image),
-			Version:   version,
+			Patch:     shared.PatchOf(version),
 		})
 		if err != nil {
 			return err

@@ -8,17 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Champion struct {
+type LolChampion struct {
 	ID        int32              `json:"id"`
 	Slug      string             `json:"slug"`
 	Name      string             `json:"name"`
 	Title     string             `json:"title"`
 	ImgUrl    string             `json:"imgUrl"`
-	Version   string             `json:"version"`
+	Patch     string             `json:"patch"`
 	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
 }
 
-type Item struct {
+type LolItem struct {
 	ID        int32              `json:"id"`
 	Name      string             `json:"name"`
 	Plaintext string             `json:"plaintext"`
@@ -28,11 +28,71 @@ type Item struct {
 	IntoItems []int32            `json:"intoItems"`
 	IsSr      bool               `json:"isSr"`
 	ImgUrl    string             `json:"imgUrl"`
-	Version   string             `json:"version"`
+	Patch     string             `json:"patch"`
 	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
 }
 
-type Player struct {
+type LolMatch struct {
+	ID                string             `json:"id"`
+	Server            string             `json:"server"`
+	Mode              string             `json:"mode"`
+	Patch             string             `json:"patch"`
+	GameStartAt       pgtype.Timestamptz `json:"gameStartAt"`
+	DurationSec       int32              `json:"durationSec"`
+	IsRemake          bool               `json:"isRemake"`
+	EstimatedRank     pgtype.Text        `json:"estimatedRank"`
+	BannedChampionIds []int32            `json:"bannedChampionIds"`
+	WinningTeam       int16              `json:"winningTeam"`
+	Team1Kills        int16              `json:"team1Kills"`
+	Team1DragonKills  int16              `json:"team1DragonKills"`
+	Team1HeraldKills  int16              `json:"team1HeraldKills"`
+	Team1BaronKills   int16              `json:"team1BaronKills"`
+	Team2Kills        int16              `json:"team2Kills"`
+	Team2DragonKills  int16              `json:"team2DragonKills"`
+	Team2HeraldKills  int16              `json:"team2HeraldKills"`
+	Team2BaronKills   int16              `json:"team2BaronKills"`
+	CreatedAt         pgtype.Timestamptz `json:"createdAt"`
+}
+
+type LolMatchParticipant struct {
+	MatchID              string      `json:"matchId"`
+	ParticipantID        int16       `json:"participantId"`
+	Team                 int16       `json:"team"`
+	IsWin                bool        `json:"isWin"`
+	PlayerID             string      `json:"playerId"`
+	RiotName             string      `json:"riotName"`
+	RiotTag              string      `json:"riotTag"`
+	RankPower            pgtype.Int4 `json:"rankPower"`
+	ChampionID           int32       `json:"championId"`
+	ChampLevel           int16       `json:"champLevel"`
+	Position             pgtype.Text `json:"position"`
+	Kills                int16       `json:"kills"`
+	Deaths               int16       `json:"deaths"`
+	Assists              int16       `json:"assists"`
+	Kda                  float32     `json:"kda"`
+	KillParticipation    float32     `json:"killParticipation"`
+	GoldEarned           int32       `json:"goldEarned"`
+	MinionsKilled        int32       `json:"minionsKilled"`
+	NeutralMinionsKilled int32       `json:"neutralMinionsKilled"`
+	Cs                   int32       `json:"cs"`
+	DmgToChamps          int32       `json:"dmgToChamps"`
+	PhysicalDmgToChamps  int32       `json:"physicalDmgToChamps"`
+	MagicDmgToChamps     int32       `json:"magicDmgToChamps"`
+	TrueDmgToChamps      int32       `json:"trueDmgToChamps"`
+	DmgTaken             int32       `json:"dmgTaken"`
+	VisionScore          int32       `json:"visionScore"`
+	PerfScore            int32       `json:"perfScore"`
+	Spell1ID             int16       `json:"spell1Id"`
+	Spell2ID             int16       `json:"spell2Id"`
+	RunePrimaryStyle     int32       `json:"runePrimaryStyle"`
+	RuneSubStyle         int32       `json:"runeSubStyle"`
+	KeyRune              int32       `json:"keyRune"`
+	Runes                []int32     `json:"runes"`
+	StatRunes            []int32     `json:"statRunes"`
+	Items                []int32     `json:"items"`
+}
+
+type LolPlayer struct {
 	ID              string             `json:"id"`
 	Server          string             `json:"server"`
 	Name            string             `json:"name"`
