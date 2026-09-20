@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"backend/src/db"
@@ -12,40 +13,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ---------- enum ----------
-
-type LolGameMode string
-
-const (
-	LolGameModeSolo   LolGameMode = "SOLO"   // queue 420
-	LolGameModeFlex   LolGameMode = "FLEX"   // queue 440
-	LolGameModeAram   LolGameMode = "ARAM"   // map 12 (Howling Abyss)
-	LolGameModeNormal LolGameMode = "NORMAL" // còn lại
-)
-
-type LolPosition string
-
-const (
-	LolPositionTop LolPosition = "TOP" // Riot teamPosition TOP
-	LolPositionJgl LolPosition = "JGL" // JUNGLE
-	LolPositionMid LolPosition = "MID" // MIDDLE
-	LolPositionAdc LolPosition = "ADC" // BOTTOM
-	LolPositionSpt LolPosition = "SPT" // UTILITY
-	LolPositionUnk LolPosition = "UNK" // rỗng / giá trị lạ (ARAM, Arena...)
-)
-
-const (
-	queueRankedSolo = 420
-	queueRankedFlex = 440
-	mapHowlingAbyss = 12
-)
-
 // ---------- entity ----------
 
-type LolMatch struct {
+type Match struct {
 	Id                string                `json:"id"`
-	Server            RiotServer            `json:"server"`
-	Mode              LolGameMode           `json:"mode"`
+	Server            Server                `json:"server"`
+	Mode              GameMode              `json:"mode"`
 	Patch             string                `json:"patch"`
 	GameStartAt       time.Time             `json:"gameStartAt"`
 	DurationSec       int32                 `json:"durationSec"`
@@ -62,14 +35,14 @@ type LolMatch struct {
 	Team2HeraldKills  int16                 `json:"team2HeraldKills"`
 	Team2BaronKills   int16                 `json:"team2BaronKills"`
 	CreatedAt         time.Time             `json:"createdAt"`
-	Participants      []LolMatchParticipant `json:"participants"`
+	Participants      []MatchParticipant    `json:"participants"`
 }
 
-func ToLolMatch(m db.LolMatch, participants []LolMatchParticipant) LolMatch {
-	return LolMatch{
+func ToMatch(m db.LolMatch, participants []MatchParticipant) Match {
+	return Match{
 		Id:                m.ID,
-		Server:            RiotServer(m.Server),
-		Mode:              LolGameMode(m.Mode),
+		Server:            Server(m.Server),
+		Mode:              GameMode(m.Mode),
 		Patch:             m.Patch,
 		GameStartAt:       m.GameStartAt.Time,
 		DurationSec:       m.DurationSec,
@@ -90,16 +63,17 @@ func ToLolMatch(m db.LolMatch, participants []LolMatchParticipant) LolMatch {
 	}
 }
 
-type LolMatchParticipant struct {
+type MatchParticipant struct {
 	Team                 int16                  `json:"team"`
 	IsWin                bool                   `json:"isWin"`
 	PlayerId             string                 `json:"playerId"`
-	RiotName             string                 `json:"riotName"`
-	RiotTag              string                 `json:"riotTag"`
+	Name                 string                 `json:"name"`
+	Tag                  string                 `json:"tag"`
 	RankPower            shared.Nullable[int32] `json:"rankPower"`
 	ChampionId           int32                  `json:"championId"`
+	ChampionSlug         string                 `json:"championSlug"`
 	ChampLevel           int16                  `json:"champLevel"`
-	Position             LolPosition            `json:"position"`
+	Position             Position               `json:"position"`
 	Kills                int16                  `json:"kills"`
 	Deaths               int16                  `json:"deaths"`
 	Assists              int16                  `json:"assists"`
@@ -126,17 +100,18 @@ type LolMatchParticipant struct {
 	Items                []int32                `json:"items"`
 }
 
-func ToLolMatchParticipant(p db.LolMatchParticipant) LolMatchParticipant {
-	return LolMatchParticipant{
+func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
+	return MatchParticipant{
 		Team:                 p.Team,
 		IsWin:                p.IsWin,
 		PlayerId:             p.PlayerID,
-		RiotName:             p.RiotName,
-		RiotTag:              p.RiotTag,
+		Name:                 p.Name,
+		Tag:                  p.Tag,
 		RankPower:            shared.NullableInt4(p.RankPower),
 		ChampionId:           p.ChampionID,
+		ChampionSlug:         p.ChampionSlug,
 		ChampLevel:           p.ChampLevel,
-		Position:             LolPosition(p.Position),
+		Position:             Position(p.Position),
 		Kills:                p.Kills,
 		Deaths:               p.Deaths,
 		Assists:              p.Assists,
@@ -171,9 +146,9 @@ func ToLolMatchParticipant(p db.LolMatchParticipant) LolMatchParticipant {
 // bằng pgx batch trong 1 transaction, rồi đọc lại 1 lần. Match đã có thì không ghi đè (DO NOTHING).
 // 1 match lỗi => không match nào được lưu.
 // Kết quả theo game_start_at giảm dần.
-func (a *Application) SaveLolMatchesToDb(ctx context.Context, matches []*external.MatchDto) ([]LolMatch, error) {
+func (a *Application) SaveMatchesToDb(ctx context.Context, matches []*external.MatchDto) ([]Match, error) {
 	if len(matches) == 0 {
-		return []LolMatch{}, nil
+		return []Match{}, nil
 	}
 
 	puuids := []string{}
@@ -215,47 +190,47 @@ func (a *Application) SaveLolMatchesToDb(ctx context.Context, matches []*externa
 		return nil, err
 	}
 
-	return a.getLolMatchesByIds(ctx, ids)
+	return a.getMatchesByIds(ctx, ids)
 }
 
 // Lấy list match id của player từ Riot (start = offset, count = số match; 0 => Riot default 20, tối đa 100);
 // match đã có trong DB thì đọc DB,
-// còn lại gọi Riot (GetMatchesByIds, song song theo batch) rồi lưu tất cả 1 lần bằng SaveLolMatchesToDb.
+// còn lại gọi Riot (GetMatchesByIds, song song theo batch) rồi lưu tất cả 1 lần bằng SaveMatchesToDb.
 // mode: NULL = mọi mode; chỉ nhận SOLO | FLEX (lọc theo queue của Riot), mode khác => err.
 // Kết quả theo thứ tự Riot trả về (mới nhất trước).
 // Không tìm thấy player => IsNull = true, err = nil.
-func (a *Application) GetLolMatchesByPlayerInfo(ctx context.Context, server RiotServer, name, tag string, mode shared.Nullable[LolGameMode], start, count int) (shared.Nullable[[]LolMatch], error) {
-	regions, ok := serverRegions[server]
-	if !ok {
-		return shared.Nullable[[]LolMatch]{}, fmt.Errorf("invalid server: %q", server)
+func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server, name, tag string, mode shared.Nullable[GameMode], start, count int) (shared.Nullable[[]Match], error) {
+	if !server.IsValid() {
+		return shared.Nullable[[]Match]{}, fmt.Errorf("invalid server: %q", server)
 	}
+	routing := server.riot()
 	opts := external.MatchIdsOptions{Start: start, Count: count}
 	if !mode.IsNull {
 		queue, ok := riotQueueOf(mode.Value)
 		if !ok {
-			return shared.Nullable[[]LolMatch]{}, fmt.Errorf("unsupported mode: %q", mode.Value)
+			return shared.Nullable[[]Match]{}, fmt.Errorf("unsupported mode: %q", mode.Value)
 		}
 		opts.Queue = &queue
 	}
 
-	player, err := a.FindLolPlayerByPlayerInfo(ctx, server, name, tag)
+	player, err := a.FindPlayerByPlayerInfo(ctx, server, name, tag)
 	if err != nil {
-		return shared.Nullable[[]LolMatch]{}, err
+		return shared.Nullable[[]Match]{}, err
 	}
 	if player.IsNull {
-		return shared.Nullable[[]LolMatch]{IsNull: true}, nil
+		return shared.Nullable[[]Match]{IsNull: true}, nil
 	}
 
-	matchIds, err := a.riot.GetMatchIdsByPuuid(ctx, regions.match, player.Value.Id, opts)
+	matchIds, err := a.riot.GetMatchIdsByPuuid(ctx, routing.matchRegion, player.Value.Id, opts)
 	if err != nil {
-		return shared.Nullable[[]LolMatch]{}, err
+		return shared.Nullable[[]Match]{}, err
 	}
 
-	existing, err := a.getLolMatchesByIds(ctx, matchIds)
+	existing, err := a.getMatchesByIds(ctx, matchIds)
 	if err != nil {
-		return shared.Nullable[[]LolMatch]{}, err
+		return shared.Nullable[[]Match]{}, err
 	}
-	byId := map[string]LolMatch{}
+	byId := map[string]Match{}
 	for _, m := range existing {
 		byId[m.Id] = m
 	}
@@ -267,94 +242,34 @@ func (a *Application) GetLolMatchesByPlayerInfo(ctx context.Context, server Riot
 		}
 	}
 	// Đợt 1: chỉ gọi Riot.
-	dtos, err := a.riot.GetMatchesByIdsInParallel(ctx, regions.match, missingIds)
+	dtos, err := a.riot.GetMatchesByIdsInParallel(ctx, routing.matchRegion, missingIds)
 	if err != nil {
-		return shared.Nullable[[]LolMatch]{}, err
+		return shared.Nullable[[]Match]{}, err
 	}
 
 	// Đợt 2: lưu tất cả trong 1 lần.
-	saved, err := a.SaveLolMatchesToDb(ctx, dtos)
+	saved, err := a.SaveMatchesToDb(ctx, dtos)
 	if err != nil {
-		return shared.Nullable[[]LolMatch]{}, err
+		return shared.Nullable[[]Match]{}, err
 	}
 	for _, m := range saved {
 		byId[m.Id] = m
 	}
 
-	out := make([]LolMatch, 0, len(matchIds))
+	out := make([]Match, 0, len(matchIds))
 	for _, id := range matchIds {
 		if m, ok := byId[id]; ok {
 			out = append(out, m)
 		}
 	}
-	return shared.Nullable[[]LolMatch]{Value: out}, nil
+	return shared.Nullable[[]Match]{Value: out}, nil
 }
 
 // ---------- private ----------
 
-func lolGameModeOf(queueId, mapId int) LolGameMode {
-	switch {
-	case queueId == queueRankedSolo:
-		return LolGameModeSolo
-	case queueId == queueRankedFlex:
-		return LolGameModeFlex
-	case mapId == mapHowlingAbyss:
-		return LolGameModeAram
-	}
-	return LolGameModeNormal
-}
-
-// Riot teamPosition => LolPosition. Rỗng / giá trị lạ (ARAM, Arena...) => UNK.
-func lolPositionOf(teamPosition string) LolPosition {
-	switch teamPosition {
-	case "TOP":
-		return LolPositionTop
-	case "JUNGLE":
-		return LolPositionJgl
-	case "MIDDLE":
-		return LolPositionMid
-	case "BOTTOM":
-		return LolPositionAdc
-	case "UTILITY":
-		return LolPositionSpt
-	}
-	return LolPositionUnk
-}
-
-// Queue id Riot để lọc match theo mode. ok = false nếu mode không lọc được bằng 1 queue (ARAM, NORMAL).
-func riotQueueOf(mode LolGameMode) (queue int, ok bool) {
-	switch mode {
-	case LolGameModeSolo:
-		return queueRankedSolo, true
-	case LolGameModeFlex:
-		return queueRankedFlex, true
-	}
-	return 0, false
-}
-
 // Riot teamId 100 => 1 (blue), 200 => 2 (red).
 func teamOf(riotTeamId int) int16 {
 	return int16(riotTeamId / 100)
-}
-
-// Trung bình rank power (đã bỏ unknown / UNRANKED) => rank ứng với bậc đó.
-// Không có ai => NULL. Master trở lên LP không giới hạn nên bậc vượt Challenger thì lấy Challenger.
-func estimatedRankOf(rankPowers []int32) shared.Nullable[Rank] {
-	if len(rankPowers) == 0 {
-		return shared.Nullable[Rank]{IsNull: true}
-	}
-	var sum int64
-	for _, p := range rankPowers {
-		sum += int64(p)
-	}
-	level := int32(sum / int64(len(rankPowers)) / rankPowerPerRank)
-	level = max(rankLevels[RankIron], min(level, rankLevels[RankChallenger]))
-	for rank, l := range rankLevels {
-		if l == level {
-			return shared.Nullable[Rank]{Value: rank}
-		}
-	}
-	return shared.Nullable[Rank]{IsNull: true}
 }
 
 func puuidsOf(match *external.MatchDto) []string {
@@ -381,10 +296,16 @@ func (a *Application) rankPowersOf(ctx context.Context, puuids []string) (map[st
 // Map MatchDto thành params insert match + participants. rankPowers từ rankPowersOf.
 func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nullable[int32]) (db.InsertMatchesParams, []db.InsertMatchParticipantsParams) {
 	info := match.Info
+	// Riot trả platform id ("VN2"), DB lưu enum Server của app ("VN"). Platform lạ (Riot mở server
+	// mới) thì giữ nguyên giá trị Riot để không mất dữ liệu, dù nó không khớp enum nào.
+	server := strings.ToUpper(info.PlatformId)
+	if s := serverOf(info.PlatformId); !s.IsNull {
+		server = string(s.Value)
+	}
 	matchParams := db.InsertMatchesParams{
 		ID:                match.Metadata.MatchId,
-		Server:            info.PlatformId,
-		Mode:              string(lolGameModeOf(info.QueueId, info.MapId)),
+		Server:            server,
+		Mode:              string(gameModeOf(info.QueueId, info.MapId)),
 		Patch:             shared.PatchOf(info.GameVersion),
 		GameStartAt:       pgtype.Timestamptz{Time: time.UnixMilli(info.GameStartTimestamp), Valid: true},
 		DurationSec:       int32(info.GameDuration),
@@ -473,7 +394,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		killParticipation = float32(p.Kills+p.Assists) / float32(teamKills)
 	}
 
-	position := lolPositionOf(p.TeamPosition)
+	position := positionOf(p.TeamPosition)
 	// Dùng killParticipation đã ép float32 để tính lại từ DB (cột REAL) ra đúng điểm này.
 	perfScore := perfScoreOf(perfScoreInput{
 		Position:          position,
@@ -490,10 +411,11 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		Team:                 teamOf(p.TeamId),
 		IsWin:                p.Win,
 		PlayerID:             p.Puuid,
-		RiotName:             p.RiotIdGameName,
-		RiotTag:              p.RiotIdTagline,
+		Name:                 p.RiotIdGameName,
+		Tag:                  p.RiotIdTagline,
 		RankPower:            shared.PgInt4(rankPower),
 		ChampionID:           int32(p.ChampionId),
+		ChampionSlug:         p.ChampionName,
 		ChampLevel:           int16(p.ChampLevel),
 		Position:             string(position),
 		Kills:                int16(p.Kills),
@@ -526,7 +448,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 
 // Đọc matches rồi participants của chúng (2 query), ghép theo match id.
 // Id không có trong DB thì bỏ qua. Thứ tự theo game_start_at giảm dần.
-func (a *Application) getLolMatchesByIds(ctx context.Context, ids []string) ([]LolMatch, error) {
+func (a *Application) getMatchesByIds(ctx context.Context, ids []string) ([]Match, error) {
 	matchRows, err := a.q.GetMatchesByIds(ctx, ids)
 	if err != nil {
 		return nil, err
@@ -536,13 +458,13 @@ func (a *Application) getLolMatchesByIds(ctx context.Context, ids []string) ([]L
 		return nil, err
 	}
 
-	participantsByMatchId := map[string][]LolMatchParticipant{}
+	participantsByMatchId := map[string][]MatchParticipant{}
 	for _, p := range participantRows {
-		participantsByMatchId[p.MatchID] = append(participantsByMatchId[p.MatchID], ToLolMatchParticipant(p))
+		participantsByMatchId[p.MatchID] = append(participantsByMatchId[p.MatchID], ToMatchParticipant(p))
 	}
-	out := make([]LolMatch, 0, len(matchRows))
+	out := make([]Match, 0, len(matchRows))
 	for _, m := range matchRows {
-		out = append(out, ToLolMatch(m, participantsByMatchId[m.ID]))
+		out = append(out, ToMatch(m, participantsByMatchId[m.ID]))
 	}
 	return out, nil
 }

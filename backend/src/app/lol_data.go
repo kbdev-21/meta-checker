@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"slices"
 	"strconv"
 	"time"
 
@@ -13,23 +12,9 @@ import (
 
 const ddragonLang = "en_US"
 
-// ---------- enum ----------
-
-type ItemType string
-
-const (
-	ItemTypeConsumable ItemType = "CONSUMABLE" // tags có Consumable
-	ItemTypeTrinket    ItemType = "TRINKET"    // tags có Trinket
-	ItemTypeBoots      ItemType = "BOOTS"      // tags có Boots
-	ItemTypeStarter    ItemType = "STARTER"    // không from, không into, còn mua được
-	ItemTypeBasic      ItemType = "BASIC"      // không from, có into
-	ItemTypeEpic       ItemType = "EPIC"       // có from, có into
-	ItemTypeLegendary  ItemType = "LEGENDARY"  // có from, không into
-)
-
 // ---------- entity ----------
 
-type LolChampion struct {
+type Champion struct {
 	Id        int32     `json:"id"`
 	Slug      string    `json:"slug"`
 	Name      string    `json:"name"`
@@ -39,8 +24,8 @@ type LolChampion struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func ToLolChampion(c db.LolChampion) LolChampion {
-	return LolChampion{
+func ToChampion(c db.LolChampion) Champion {
+	return Champion{
 		Id:        c.ID,
 		Slug:      c.Slug,
 		Name:      c.Name,
@@ -51,63 +36,64 @@ func ToLolChampion(c db.LolChampion) LolChampion {
 	}
 }
 
-type LolItem struct {
-	Id        int32     `json:"id"`
-	Name      string    `json:"name"`
-	Plaintext string    `json:"plaintext"`
-	Type      ItemType  `json:"type"`
-	GoldTotal int32     `json:"goldTotal"`
-	FromItems []int32   `json:"fromItems"`
-	IntoItems []int32   `json:"intoItems"`
-	IsSr      bool      `json:"isSr"`
-	ImgUrl    string    `json:"imgUrl"`
-	Patch     string    `json:"patch"`
-	UpdatedAt time.Time `json:"updatedAt"`
+type Item struct {
+	Id              int32     `json:"id"`
+	Name            string    `json:"name"`
+	Plaintext       string    `json:"plaintext"`
+	Type            ItemType  `json:"type"`
+	GoldTotal       int32     `json:"goldTotal"`
+	FromItems       []int32   `json:"fromItems"`
+	IntoItems       []int32   `json:"intoItems"`
+	IsSummonersRift bool      `json:"isSummonersRift"`
+	ImgUrl          string    `json:"imgUrl"`
+	Patch           string    `json:"patch"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
-func ToLolItem(i db.LolItem) LolItem {
-	return LolItem{
-		Id:        i.ID,
-		Name:      i.Name,
-		Plaintext: i.Plaintext,
-		Type:      ItemType(i.Type),
-		GoldTotal: i.GoldTotal,
-		FromItems: i.FromItems,
-		IntoItems: i.IntoItems,
-		IsSr:      i.IsSr,
-		ImgUrl:    i.ImgUrl,
-		Patch:     i.Patch,
-		UpdatedAt: i.UpdatedAt.Time,
+func ToItem(i db.LolItem) Item {
+	return Item{
+		Id:              i.ID,
+		Name:            i.Name,
+		Plaintext:       i.Plaintext,
+		Type:            ItemType(i.Type),
+		GoldTotal:       i.GoldTotal,
+		FromItems:       i.FromItems,
+		IntoItems:       i.IntoItems,
+		IsSummonersRift: i.IsSummonersRift,
+		ImgUrl:          i.ImgUrl,
+		Patch:           i.Patch,
+		UpdatedAt:       i.UpdatedAt.Time,
 	}
 }
 
 // ---------- logic ----------
 
-func (a *Application) GetLolChampions(ctx context.Context) ([]LolChampion, error) {
+func (a *Application) GetChampions(ctx context.Context) ([]Champion, error) {
 	rows, err := a.q.ListChampions(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []LolChampion{}
+	out := []Champion{}
 	for _, r := range rows {
-		out = append(out, ToLolChampion(r))
+		out = append(out, ToChampion(r))
 	}
 	return out, nil
 }
 
-func (a *Application) GetLolItems(ctx context.Context) ([]LolItem, error) {
+func (a *Application) GetItems(ctx context.Context) ([]Item, error) {
 	rows, err := a.q.ListItems(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []LolItem{}
+	out := []Item{}
 	for _, r := range rows {
-		out = append(out, ToLolItem(r))
+		out = append(out, ToItem(r))
 	}
 	return out, nil
 }
 
-func (a *Application) UpdateLolChampions(ctx context.Context) error {
+// version đầy đủ của ddragon ("16.18.1") chỉ dùng để dựng URL ảnh; thứ lưu vào DB là patch ("16.18").
+func (a *Application) UpdateChampions(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
@@ -144,7 +130,8 @@ func (a *Application) UpdateLolChampions(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
-func (a *Application) UpdateLolItems(ctx context.Context) error {
+// Xem UpdateChampions về version vs patch.
+func (a *Application) UpdateItems(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
 		return err
@@ -179,44 +166,20 @@ func (a *Application) UpdateLolItems(ctx context.Context) error {
 			return err
 		}
 		err = q.UpsertItem(ctx, db.UpsertItemParams{
-			ID:        int32(id),
-			Name:      it.Name,
-			Plaintext: it.Plaintext,
-			Type:      string(t),
-			GoldTotal: int32(it.Gold.Total),
-			FromItems: from,
-			IntoItems: into,
-			IsSr:      it.Maps["11"],
-			ImgUrl:    external.DDImgUrl(version, it.Image),
-			Patch:     shared.PatchOf(version),
+			ID:              int32(id),
+			Name:            it.Name,
+			Plaintext:       it.Plaintext,
+			Type:            string(t),
+			GoldTotal:       int32(it.Gold.Total),
+			FromItems:       from,
+			IntoItems:       into,
+			IsSummonersRift: it.Maps["11"],
+			ImgUrl:          external.DDImgUrl(version, it.Image),
+			Patch:           shared.PatchOf(version),
 		})
 		if err != nil {
 			return err
 		}
 	}
 	return tx.Commit(ctx)
-}
-
-// ---------- private ----------
-
-// Xét theo thứ tự các ItemType ở trên. ok = false nếu không thuộc loại nào (item không mua được, item riêng của tướng...).
-func itemTypeOf(it external.DDItem) (t ItemType, ok bool) {
-	hasFrom, hasInto := len(it.From) > 0, len(it.Into) > 0
-	switch {
-	case slices.Contains(it.Tags, "Consumable"):
-		return ItemTypeConsumable, true
-	case slices.Contains(it.Tags, "Trinket"):
-		return ItemTypeTrinket, true
-	case slices.Contains(it.Tags, "Boots"):
-		return ItemTypeBoots, true
-	case !hasFrom && !hasInto && it.Gold.Purchasable:
-		return ItemTypeStarter, true
-	case !hasFrom && hasInto:
-		return ItemTypeBasic, true
-	case hasFrom && hasInto:
-		return ItemTypeEpic, true
-	case hasFrom && !hasInto:
-		return ItemTypeLegendary, true
-	}
-	return "", false
 }

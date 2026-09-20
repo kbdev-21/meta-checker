@@ -10,7 +10,7 @@ ON CONFLICT (id) DO UPDATE SET
     updated_at = now();
 
 -- name: UpsertItem :exec
-INSERT INTO lol_items (id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, patch)
+INSERT INTO lol_items (id, name, plaintext, type, gold_total, from_items, into_items, is_summoners_rift, img_url, patch)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE SET
     name       = EXCLUDED.name,
@@ -19,7 +19,7 @@ ON CONFLICT (id) DO UPDATE SET
     gold_total = EXCLUDED.gold_total,
     from_items = EXCLUDED.from_items,
     into_items = EXCLUDED.into_items,
-    is_sr      = EXCLUDED.is_sr,
+    is_summoners_rift = EXCLUDED.is_summoners_rift,
     img_url    = EXCLUDED.img_url,
     patch      = EXCLUDED.patch,
     updated_at = now();
@@ -33,7 +33,7 @@ SELECT * FROM lol_items ORDER BY id;
 -- Rank solo/flex truyền vào NULL (unknown) thì giữ nguyên cả nhóm cột rank cũ.
 -- name: UpsertPlayer :exec
 INSERT INTO lol_players (
-    id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string,
+    id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string,
     solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses,
     flex_rank, flex_tier, flex_lp, flex_wins, flex_losses
 )
@@ -45,7 +45,7 @@ ON CONFLICT (id) DO UPDATE SET
     normalized_name = EXCLUDED.normalized_name,
     normalized_tag  = EXCLUDED.normalized_tag,
     profile_icon_id = COALESCE(EXCLUDED.profile_icon_id, lol_players.profile_icon_id),
-    summoner_level  = COALESCE(EXCLUDED.summoner_level, lol_players.summoner_level),
+    level           = COALESCE(EXCLUDED.level, lol_players.level),
     search_string   = EXCLUDED.search_string,
 
     solo_rank       = COALESCE(EXCLUDED.solo_rank, lol_players.solo_rank),
@@ -98,8 +98,8 @@ ON CONFLICT (id) DO NOTHING;
 -- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
     match_id, team, is_win, player_id,
-    riot_name, riot_tag, rank_power,
-    champion_id, champ_level, position,
+    name, tag, rank_power,
+    champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
     gold_earned, minions_killed, neutral_minions_killed, cs,
     dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
@@ -110,7 +110,7 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
 )
 ON CONFLICT (match_id, player_id) DO NOTHING;
 

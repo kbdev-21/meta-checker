@@ -20,8 +20,8 @@ var (
 const insertMatchParticipants = `-- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
     match_id, team, is_win, player_id,
-    riot_name, riot_tag, rank_power,
-    champion_id, champ_level, position,
+    name, tag, rank_power,
+    champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
     gold_earned, minions_killed, neutral_minions_killed, cs,
     dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
@@ -32,7 +32,7 @@ INSERT INTO lol_match_participants (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
+    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
 )
 ON CONFLICT (match_id, player_id) DO NOTHING
 `
@@ -48,10 +48,11 @@ type InsertMatchParticipantsParams struct {
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
-	RiotName             string      `json:"riotName"`
-	RiotTag              string      `json:"riotTag"`
+	Name                 string      `json:"name"`
+	Tag                  string      `json:"tag"`
 	RankPower            pgtype.Int4 `json:"rankPower"`
 	ChampionID           int32       `json:"championId"`
+	ChampionSlug         string      `json:"championSlug"`
 	ChampLevel           int16       `json:"champLevel"`
 	Position             string      `json:"position"`
 	Kills                int16       `json:"kills"`
@@ -89,10 +90,11 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.Team,
 			a.IsWin,
 			a.PlayerID,
-			a.RiotName,
-			a.RiotTag,
+			a.Name,
+			a.Tag,
 			a.RankPower,
 			a.ChampionID,
+			a.ChampionSlug,
 			a.ChampLevel,
 			a.Position,
 			a.Kills,

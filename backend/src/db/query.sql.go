@@ -12,7 +12,7 @@ import (
 )
 
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
-SELECT match_id, team, is_win, player_id, riot_name, riot_tag, rank_power, champion_id, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
+SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
 ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id
 `
@@ -31,10 +31,11 @@ func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds [
 			&i.Team,
 			&i.IsWin,
 			&i.PlayerID,
-			&i.RiotName,
-			&i.RiotTag,
+			&i.Name,
+			&i.Tag,
 			&i.RankPower,
 			&i.ChampionID,
+			&i.ChampionSlug,
 			&i.ChampLevel,
 			&i.Position,
 			&i.Kills,
@@ -120,7 +121,7 @@ func (q *Queries) GetMatchesByIds(ctx context.Context, ids []string) ([]LolMatch
 }
 
 const getPlayerById = `-- name: GetPlayerById :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = $1
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = $1
 `
 
 func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, error) {
@@ -134,7 +135,7 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, erro
 		&i.NormalizedName,
 		&i.NormalizedTag,
 		&i.ProfileIconID,
-		&i.SummonerLevel,
+		&i.Level,
 		&i.SearchString,
 		&i.SoloRank,
 		&i.SoloTier,
@@ -156,7 +157,7 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, erro
 }
 
 const getPlayerByServerNameAndTag = `-- name: GetPlayerByServerNameAndTag :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
 `
 
 type GetPlayerByServerNameAndTagParams struct {
@@ -177,7 +178,7 @@ func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayer
 		&i.NormalizedName,
 		&i.NormalizedTag,
 		&i.ProfileIconID,
-		&i.SummonerLevel,
+		&i.Level,
 		&i.SearchString,
 		&i.SoloRank,
 		&i.SoloTier,
@@ -199,7 +200,7 @@ func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayer
 }
 
 const getPlayersByIds = `-- name: GetPlayersByIds :many
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = ANY($1::text[])
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = ANY($1::text[])
 `
 
 // Id không có trong DB thì bỏ qua.
@@ -220,7 +221,7 @@ func (q *Queries) GetPlayersByIds(ctx context.Context, ids []string) ([]LolPlaye
 			&i.NormalizedName,
 			&i.NormalizedTag,
 			&i.ProfileIconID,
-			&i.SummonerLevel,
+			&i.Level,
 			&i.SearchString,
 			&i.SoloRank,
 			&i.SoloTier,
@@ -281,7 +282,7 @@ func (q *Queries) ListChampions(ctx context.Context) ([]LolChampion, error) {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, patch, updated_at FROM lol_items ORDER BY id
+SELECT id, name, plaintext, type, gold_total, from_items, into_items, is_summoners_rift, img_url, patch, updated_at FROM lol_items ORDER BY id
 `
 
 func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
@@ -301,7 +302,7 @@ func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
 			&i.GoldTotal,
 			&i.FromItems,
 			&i.IntoItems,
-			&i.IsSr,
+			&i.IsSummonersRift,
 			&i.ImgUrl,
 			&i.Patch,
 			&i.UpdatedAt,
@@ -317,7 +318,7 @@ func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
 }
 
 const searchPlayers = `-- name: SearchPlayers :many
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players
 WHERE name ILIKE '%' || $1::text || '%'
    OR tag ILIKE '%' || $1::text || '%'
    OR search_string LIKE '%' || $2::text || '%'
@@ -348,7 +349,7 @@ func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([
 			&i.NormalizedName,
 			&i.NormalizedTag,
 			&i.ProfileIconID,
-			&i.SummonerLevel,
+			&i.Level,
 			&i.SearchString,
 			&i.SoloRank,
 			&i.SoloTier,
@@ -410,7 +411,7 @@ func (q *Queries) UpsertChampion(ctx context.Context, arg UpsertChampionParams) 
 }
 
 const upsertItem = `-- name: UpsertItem :exec
-INSERT INTO lol_items (id, name, plaintext, type, gold_total, from_items, into_items, is_sr, img_url, patch)
+INSERT INTO lol_items (id, name, plaintext, type, gold_total, from_items, into_items, is_summoners_rift, img_url, patch)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE SET
     name       = EXCLUDED.name,
@@ -419,23 +420,23 @@ ON CONFLICT (id) DO UPDATE SET
     gold_total = EXCLUDED.gold_total,
     from_items = EXCLUDED.from_items,
     into_items = EXCLUDED.into_items,
-    is_sr      = EXCLUDED.is_sr,
+    is_summoners_rift = EXCLUDED.is_summoners_rift,
     img_url    = EXCLUDED.img_url,
     patch      = EXCLUDED.patch,
     updated_at = now()
 `
 
 type UpsertItemParams struct {
-	ID        int32   `json:"id"`
-	Name      string  `json:"name"`
-	Plaintext string  `json:"plaintext"`
-	Type      string  `json:"type"`
-	GoldTotal int32   `json:"goldTotal"`
-	FromItems []int32 `json:"fromItems"`
-	IntoItems []int32 `json:"intoItems"`
-	IsSr      bool    `json:"isSr"`
-	ImgUrl    string  `json:"imgUrl"`
-	Patch     string  `json:"patch"`
+	ID              int32   `json:"id"`
+	Name            string  `json:"name"`
+	Plaintext       string  `json:"plaintext"`
+	Type            string  `json:"type"`
+	GoldTotal       int32   `json:"goldTotal"`
+	FromItems       []int32 `json:"fromItems"`
+	IntoItems       []int32 `json:"intoItems"`
+	IsSummonersRift bool    `json:"isSummonersRift"`
+	ImgUrl          string  `json:"imgUrl"`
+	Patch           string  `json:"patch"`
 }
 
 func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
@@ -447,7 +448,7 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
 		arg.GoldTotal,
 		arg.FromItems,
 		arg.IntoItems,
-		arg.IsSr,
+		arg.IsSummonersRift,
 		arg.ImgUrl,
 		arg.Patch,
 	)
@@ -456,7 +457,7 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
 
 const upsertPlayer = `-- name: UpsertPlayer :exec
 INSERT INTO lol_players (
-    id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, summoner_level, search_string,
+    id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string,
     solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses,
     flex_rank, flex_tier, flex_lp, flex_wins, flex_losses
 )
@@ -468,7 +469,7 @@ ON CONFLICT (id) DO UPDATE SET
     normalized_name = EXCLUDED.normalized_name,
     normalized_tag  = EXCLUDED.normalized_tag,
     profile_icon_id = COALESCE(EXCLUDED.profile_icon_id, lol_players.profile_icon_id),
-    summoner_level  = COALESCE(EXCLUDED.summoner_level, lol_players.summoner_level),
+    level           = COALESCE(EXCLUDED.level, lol_players.level),
     search_string   = EXCLUDED.search_string,
 
     solo_rank       = COALESCE(EXCLUDED.solo_rank, lol_players.solo_rank),
@@ -495,7 +496,7 @@ type UpsertPlayerParams struct {
 	NormalizedName string      `json:"normalizedName"`
 	NormalizedTag  string      `json:"normalizedTag"`
 	ProfileIconID  pgtype.Int4 `json:"profileIconId"`
-	SummonerLevel  pgtype.Int4 `json:"summonerLevel"`
+	Level          pgtype.Int4 `json:"level"`
 	SearchString   string      `json:"searchString"`
 	SoloRank       pgtype.Text `json:"soloRank"`
 	SoloTier       pgtype.Text `json:"soloTier"`
@@ -520,7 +521,7 @@ func (q *Queries) UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) erro
 		arg.NormalizedName,
 		arg.NormalizedTag,
 		arg.ProfileIconID,
-		arg.SummonerLevel,
+		arg.Level,
 		arg.SearchString,
 		arg.SoloRank,
 		arg.SoloTier,

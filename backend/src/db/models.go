@@ -19,17 +19,17 @@ type LolChampion struct {
 }
 
 type LolItem struct {
-	ID        int32              `json:"id"`
-	Name      string             `json:"name"`
-	Plaintext string             `json:"plaintext"`
-	Type      string             `json:"type"`
-	GoldTotal int32              `json:"goldTotal"`
-	FromItems []int32            `json:"fromItems"`
-	IntoItems []int32            `json:"intoItems"`
-	IsSr      bool               `json:"isSr"`
-	ImgUrl    string             `json:"imgUrl"`
-	Patch     string             `json:"patch"`
-	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
+	ID              int32              `json:"id"`
+	Name            string             `json:"name"`
+	Plaintext       string             `json:"plaintext"`
+	Type            string             `json:"type"`
+	GoldTotal       int32              `json:"goldTotal"`
+	FromItems       []int32            `json:"fromItems"`
+	IntoItems       []int32            `json:"intoItems"`
+	IsSummonersRift bool               `json:"isSummonersRift"`
+	ImgUrl          string             `json:"imgUrl"`
+	Patch           string             `json:"patch"`
+	UpdatedAt       pgtype.Timestamptz `json:"updatedAt"`
 }
 
 type LolMatch struct {
@@ -59,10 +59,11 @@ type LolMatchParticipant struct {
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
-	RiotName             string      `json:"riotName"`
-	RiotTag              string      `json:"riotTag"`
+	Name                 string      `json:"name"`
+	Tag                  string      `json:"tag"`
 	RankPower            pgtype.Int4 `json:"rankPower"`
 	ChampionID           int32       `json:"championId"`
+	ChampionSlug         string      `json:"championSlug"`
 	ChampLevel           int16       `json:"champLevel"`
 	Position             string      `json:"position"`
 	Kills                int16       `json:"kills"`
@@ -99,7 +100,7 @@ type LolPlayer struct {
 	NormalizedName  string             `json:"normalizedName"`
 	NormalizedTag   string             `json:"normalizedTag"`
 	ProfileIconID   pgtype.Int4        `json:"profileIconId"`
-	SummonerLevel   pgtype.Int4        `json:"summonerLevel"`
+	Level           pgtype.Int4        `json:"level"`
 	SearchString    string             `json:"searchString"`
 	SoloRank        pgtype.Text        `json:"soloRank"`
 	SoloTier        pgtype.Text        `json:"soloTier"`

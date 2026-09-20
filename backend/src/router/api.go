@@ -42,7 +42,7 @@ func helloApiHandler() func(ctx fiber.Ctx) error {
 
 func getChampionsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		champs, err := a.GetLolChampions(ctx.Context())
+		champs, err := a.GetChampions(ctx.Context())
 		if err != nil {
 			log.Printf("get champions: %v", err)
 			return err
@@ -53,7 +53,7 @@ func getChampionsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 
 func getItemsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		items, err := a.GetLolItems(ctx.Context())
+		items, err := a.GetItems(ctx.Context())
 		if err != nil {
 			log.Printf("get items: %v", err)
 			return err
@@ -65,7 +65,7 @@ func getItemsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 // GET /api/lol/players?q=...
 func searchPlayersApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	return func(ctx fiber.Ctx) error {
-		players, err := a.SearchLolPlayers(ctx.Context(), ctx.Query("q"), playerSearchLimit)
+		players, err := a.SearchPlayers(ctx.Context(), ctx.Query("q"), playerSearchLimit)
 		if err != nil {
 			log.Printf("search players: %v", err)
 			return err
@@ -83,7 +83,7 @@ func findPlayerByInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 			return err
 		}
 
-		player, err := a.FindLolPlayerByPlayerInfo(ctx.Context(), server, name, tag)
+		player, err := a.FindPlayerByPlayerInfo(ctx.Context(), server, name, tag)
 		if err != nil {
 			log.Printf("find player %s/%s#%s: %v", server, name, tag, err)
 			return err
@@ -104,7 +104,7 @@ func updatePlayerByInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) error 
 			return err
 		}
 
-		_, err = a.UpdateLolPlayerByPlayerInfo(ctx.Context(), server, name, tag)
+		_, err = a.UpdatePlayerByPlayerInfo(ctx.Context(), server, name, tag)
 		if external.IsRiotNotFound(err) {
 			return ctx.SendStatus(fiber.StatusNotFound)
 		}
@@ -129,7 +129,7 @@ func getMatchesByPlayerInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) er
 			return err
 		}
 
-		matches, err := a.GetLolMatchesByPlayerInfo(ctx.Context(), server, name, tag, mode, start, count)
+		matches, err := a.GetMatchesByPlayerInfo(ctx.Context(), server, name, tag, mode, start, count)
 		if err != nil {
 			log.Printf("get matches %s/%s#%s: %v", server, name, tag, err)
 			return err
@@ -144,8 +144,8 @@ func getMatchesByPlayerInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) er
 // ---------- private ----------
 
 // Đọc :server/:name/:tag. Input sai => *fiber.Error 400.
-func playerInfoParams(ctx fiber.Ctx) (server app.RiotServer, name, tag string, err error) {
-	server = app.RiotServer(strings.ToUpper(ctx.Params("server")))
+func playerInfoParams(ctx fiber.Ctx) (server app.Server, name, tag string, err error) {
+	server = app.Server(strings.ToUpper(ctx.Params("server")))
 	if !server.IsValid() {
 		return "", "", "", fiber.NewError(fiber.StatusBadRequest, "invalid server")
 	}
@@ -162,14 +162,14 @@ func playerInfoParams(ctx fiber.Ctx) (server app.RiotServer, name, tag string, e
 }
 
 // Đọc ?mode&start&count. Input sai => *fiber.Error 400.
-func matchListParams(ctx fiber.Ctx) (mode shared.Nullable[app.LolGameMode], start, count int, err error) {
-	mode = shared.Nullable[app.LolGameMode]{IsNull: true}
+func matchListParams(ctx fiber.Ctx) (mode shared.Nullable[app.GameMode], start, count int, err error) {
+	mode = shared.Nullable[app.GameMode]{IsNull: true}
 	if q := ctx.Query("mode"); q != "" {
-		m := app.LolGameMode(strings.ToUpper(q))
-		if m != app.LolGameModeSolo && m != app.LolGameModeFlex {
+		m := app.GameMode(strings.ToUpper(q))
+		if m != app.GameModeSolo && m != app.GameModeFlex {
 			return mode, 0, 0, fiber.NewError(fiber.StatusBadRequest, "invalid mode")
 		}
-		mode = shared.Nullable[app.LolGameMode]{Value: m}
+		mode = shared.Nullable[app.GameMode]{Value: m}
 	}
 
 	start, err = strconv.Atoi(ctx.Query("start", "0"))

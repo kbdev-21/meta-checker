@@ -28,17 +28,17 @@ const (
 )
 
 // Bù kill participation cho vị trí ít tham chiến. Vị trí không có trong map thì không bù.
-var perfKpBonuses = map[LolPosition]float64{
-	LolPositionTop: 0.125,
-	LolPositionMid: 0.075,
-	LolPositionAdc: 0.075,
+var perfKpBonuses = map[Position]float64{
+	PositionTop: 0.125,
+	PositionMid: 0.075,
+	PositionAdc: 0.075,
 }
 
 // ---------- input ----------
 
 // Toàn bộ dữ liệu cần để tính perf score.
 type perfScoreInput struct {
-	Position          LolPosition
+	Position          Position
 	KillParticipation float64
 	Deaths            int
 	IsWin             bool
@@ -79,7 +79,7 @@ func perfScoreOf(in perfScoreInput) int32 {
 // thay vì đoán gold của đối thủ.
 func perfGpmDiffScoreOf(in perfScoreInput, durationMin float64) float64 {
 	neutral := perfGpmDiffWeight / 2.0
-	if in.Position == LolPositionSpt || in.LaneOpponentGold.IsNull {
+	if in.Position == PositionSpt || in.LaneOpponentGold.IsNull {
 		return neutral
 	}
 	gpmDiff := float64(in.GoldEarned-in.LaneOpponentGold.Value) / durationMin
@@ -89,12 +89,12 @@ func perfGpmDiffScoreOf(in perfScoreInput, durationMin float64) float64 {
 // Gold của đối thủ khác team, cùng vị trí.
 // Vị trí UNK (ARAM, Arena...) không có khái niệm đối lane => IsNull.
 func laneOpponentGoldOf(p external.ParticipantDto, participants []external.ParticipantDto) shared.Nullable[int] {
-	position := lolPositionOf(p.TeamPosition)
-	if position == LolPositionUnk {
+	position := positionOf(p.TeamPosition)
+	if position == PositionUnk {
 		return shared.Nullable[int]{IsNull: true}
 	}
 	for _, o := range participants {
-		if o.TeamId != p.TeamId && lolPositionOf(o.TeamPosition) == position {
+		if o.TeamId != p.TeamId && positionOf(o.TeamPosition) == position {
 			return shared.Nullable[int]{Value: o.GoldEarned}
 		}
 	}

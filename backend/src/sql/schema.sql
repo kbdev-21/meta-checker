@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS lol_items (
     gold_total  INTEGER     NOT NULL,
     from_items  INTEGER[]   NOT NULL DEFAULT '{}', -- item id của các thành phần
     into_items  INTEGER[]   NOT NULL DEFAULT '{}', -- item id nâng cấp lên
-    is_sr       BOOLEAN     NOT NULL,              -- dùng được ở Summoner's Rift (map 11)
+    is_summoners_rift BOOLEAN NOT NULL,            -- dùng được ở Summoner's Rift (map 11)
     img_url     TEXT        NOT NULL,              -- URL đầy đủ tới ảnh trên ddragon
     patch       TEXT        NOT NULL,              -- patch lúc sync, vd "16.18" (cắt từ ddragon version "16.18.1")
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -24,20 +24,20 @@ CREATE TABLE IF NOT EXISTS lol_items (
 
 CREATE TABLE IF NOT EXISTS lol_players (
     id                 TEXT        PRIMARY KEY,           -- puuid, định danh duy nhất toàn cầu của Riot
-    server             TEXT        NOT NULL,              -- VN2 | KR | EUW1 | NA1 ... (dùng cho league-v4 / summoner-v4)
+    server             TEXT        NOT NULL,              -- enum Server của app: VN | KR | EUW | NA ... (KHÔNG phải platform id của Riot)
     name               TEXT        NOT NULL,              -- Riot ID gameName, lấy từ account-v1
     tag                TEXT        NOT NULL,              -- Riot ID tagLine
     normalized_name    TEXT        NOT NULL,              -- name chữ thường + trim, giữ dấu; dùng để find chính xác
     normalized_tag     TEXT        NOT NULL,              -- tag chữ thường + trim, giữ dấu
     profile_icon_id    INTEGER,                           -- từ summoner-v4
-    summoner_level     INTEGER,
+    level              INTEGER,                           -- summonerLevel của Riot
     search_string      TEXT        NOT NULL DEFAULT '',   -- NormalizeString(normalized_name) + "#" + NormalizeString(normalized_tag), bỏ dấu
 
     -- rank solo/duo (RANKED_SOLO_5x5); rank = Riot "tier", tier = Riot "rank"
     solo_rank          TEXT,                              -- CHALLENGER | GRANDMASTER | MASTER | DIAMOND ... | UNRANKED; NULL = unknown (chưa fetch league)
     solo_tier          TEXT,                              -- I | II | III | IV; NULL = unknown
     solo_lp            INTEGER     NOT NULL DEFAULT 0,
-    solo_rank_power    INTEGER,                           -- công thức bổ sung sau
+    solo_rank_power    INTEGER,                           -- bậc rank * 400 + bậc tier * 100 + lp; NULL = unknown, 0 = unranked
     solo_wins          INTEGER     NOT NULL DEFAULT 0,
     solo_losses        INTEGER     NOT NULL DEFAULT 0,
 
@@ -61,8 +61,8 @@ CREATE INDEX IF NOT EXISTS lol_players_normalized_name_tag_idx ON lol_players (n
 
 CREATE TABLE IF NOT EXISTS lol_matches (
     id              TEXT        PRIMARY KEY,           -- metadata.matchId, vd "VN2_123456789"
-    server          TEXT        NOT NULL,              -- info.platformId: VN2 | KR ...
-    mode            TEXT        NOT NULL,              -- gộp queueId + mapId + gameMode, enum trong app: RANKED_SOLO | RANKED_FLEX | NORMAL_DRAFT | ARAM ...
+    server          TEXT        NOT NULL,              -- enum Server của app, map từ info.platformId
+    mode            TEXT        NOT NULL,              -- enum GameMode của app, gộp từ queueId + mapId: SOLO | FLEX | ARAM | NORMAL
     patch           TEXT        NOT NULL,              -- "16.18", cắt từ info.gameVersion ("16.18.712.3456") trong app
     game_start_at   TIMESTAMPTZ NOT NULL,
     duration_sec    INTEGER     NOT NULL,
@@ -93,11 +93,12 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     is_win                 BOOLEAN   NOT NULL,
     player_id              TEXT      NOT NULL,         -- puuid; KHÔNG FK tới lol_players vì không phải ai cũng được crawl
 
-    riot_name              TEXT      NOT NULL,         -- snapshot Riot ID lúc chơi
-    riot_tag               TEXT      NOT NULL,
+    name                   TEXT      NOT NULL,         -- snapshot Riot ID lúc chơi
+    tag                    TEXT      NOT NULL,
     rank_power             INTEGER,                    -- snapshot solo_rank_power lúc insert; NULL = unknown
 
     champion_id            INTEGER   NOT NULL,
+    champion_slug          TEXT      NOT NULL,         -- snapshot championName của Riot ("Aatrox", "MonkeyKing") = lol_champions.slug
     champ_level            SMALLINT  NOT NULL,
     position               TEXT      NOT NULL,         -- TOP | JGL | MID | ADC | SPT (map từ teamPosition) | UNK nếu rỗng (ARAM...)
 
