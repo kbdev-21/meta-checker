@@ -28,7 +28,8 @@ func main() {
 	fib.Use(cors.New())
 	fib.Use(logger.New())
 
-	router.InitApiRoutes(fib, a)
+	router.InitLolDataApiRoutes(fib, a)
+	router.InitLolApiRoutes(fib, a)
 
 	log.Fatal(fib.Listen(":" + cfg.Port))
 }
