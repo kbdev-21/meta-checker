@@ -34,7 +34,7 @@ func NewApplication(ctx context.Context, cfg config.Config) (*Application, error
 		cfg:     cfg,
 		p:       p,
 		q:       db.New(p),
-		riot:    external.NewRiotClient(cfg.RiotApiKey),
+		riot:    external.NewRiotClient(cfg.RiotApiKey, cfg.RiotRatePerSec, cfg.RiotRatePer2Min),
 		ddragon: external.NewDDragonClient(),
 	}, nil
 }

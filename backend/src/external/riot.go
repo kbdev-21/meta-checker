@@ -13,18 +13,25 @@ import (
 	"time"
 )
 
-// Số match gọi song song mỗi lượt trong GetMatchesByIds, tránh bị rate limit.
-const matchFetchBatchSize = 4
+// Số match gọi song song mỗi lượt trong GetMatchesByIdsInParallel. Việc giữ nhịp rate limit do
+// riotRateLimiter lo, hằng này chỉ còn giới hạn số goroutine cùng chờ.
+const matchFetchBatchSize = 10
 
 // region: americas | asia | europe | sea (account-v1, match-v5)
 // platform: vn2 | kr | na1 | euw1 | ... (league-v4, summoner-v4)
 type RiotClient struct {
-	apiKey string
-	http   *http.Client
+	apiKey  string
+	http    *http.Client
+	limiter *riotRateLimiter
 }
 
-func NewRiotClient(apiKey string) *RiotClient {
-	return &RiotClient{apiKey: apiKey, http: &http.Client{Timeout: 10 * time.Second}}
+// perSec / per2Min là trần THẬT của key; limiter tự chừa đệm an toàn bên dưới.
+func NewRiotClient(apiKey string, perSec, per2Min int) *RiotClient {
+	return &RiotClient{
+		apiKey:  apiKey,
+		http:    &http.Client{Timeout: 10 * time.Second},
+		limiter: newRiotRateLimiter(perSec, per2Min),
+	}
 }
 
 // Riot trả status khác 200.
@@ -44,28 +51,62 @@ func IsRiotNotFound(err error) bool {
 	return errors.As(err, &re) && re.StatusCode == http.StatusNotFound
 }
 
+// Xếp hàng rate limit theo host trước khi gửi. Riot vẫn trả 429 được (lệch bộ đếm, hoặc
+// 429 ở tầng service của Riot) nên tôn trọng Retry-After và thử lại tối đa riotMaxRetries lần.
 func (c *RiotClient) get(ctx context.Context, host, path string, query url.Values, out any) error {
+	priority := priorityOf(ctx)
+	for attempt := 0; ; attempt++ {
+		err := c.limiter.acquire(ctx, host, priority)
+		if err != nil {
+			return err
+		}
+
+		res, err := c.send(ctx, host, path, query)
+		if err != nil {
+			return err
+		}
+
+		if res.StatusCode == http.StatusTooManyRequests && attempt < riotMaxRetries {
+			retryAfter := retryAfterOf(res)
+			res.Body.Close()
+			err = sleepCtx(ctx, retryAfter)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		if res.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			return &RiotError{Path: path, StatusCode: res.StatusCode, Body: string(body)}
+		}
+		err = json.NewDecoder(res.Body).Decode(out)
+		res.Body.Close()
+		return err
+	}
+}
+
+func (c *RiotClient) send(ctx context.Context, host, path string, query url.Values) (*http.Response, error) {
 	u := "https://" + host + ".api.riotgames.com" + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("X-Riot-Token", c.apiKey)
+	return c.http.Do(req)
+}
 
-	res, err := c.http.Do(req)
-	if err != nil {
-		return err
+// Riot trả Retry-After theo giây. Thiếu / không parse được thì đợi 1 giây.
+func retryAfterOf(res *http.Response) time.Duration {
+	sec, err := strconv.Atoi(res.Header.Get("Retry-After"))
+	if err != nil || sec <= 0 {
+		return time.Second
 	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(res.Body)
-		return &RiotError{Path: path, StatusCode: res.StatusCode, Body: string(body)}
-	}
-	return json.NewDecoder(res.Body).Decode(out)
+	return time.Duration(sec) * time.Second
 }
 
 // ---------- account-v1 ----------
