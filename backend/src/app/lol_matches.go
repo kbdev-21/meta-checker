@@ -40,9 +40,6 @@ const (
 	mapHowlingAbyss = 12
 )
 
-// Tạm thời, sau thay bằng công thức riêng.
-const defaultPerfScore = 100
-
 // ---------- entity ----------
 
 type LolMatch struct {
@@ -432,7 +429,7 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 		if !rankPower.IsNull && rankPower.Value > 0 { // bỏ unknown và UNRANKED
 			knownRankPowers = append(knownRankPowers, rankPower.Value)
 		}
-		participantParams = append(participantParams, participantParamsOf(matchParams.ID, p, rankPower, teamKills[p.TeamId]))
+		participantParams = append(participantParams, participantParamsOf(matchParams.ID, p, rankPower, teamKills[p.TeamId], matchParams.DurationSec, laneOpponentGoldOf(p, info.Participants)))
 	}
 	matchParams.EstimatedRank = shared.PgText(estimatedRankOf(knownRankPowers))
 	return matchParams, participantParams
@@ -449,7 +446,7 @@ func execBatch(exec func(func(int, error))) error {
 	return firstErr
 }
 
-func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int) db.InsertMatchParticipantsParams {
+func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int, durationSec int32, laneOpponentGold shared.Nullable[int]) db.InsertMatchParticipantsParams {
 	var primary, sub external.PerkStyleDto
 	for _, s := range p.Perks.Styles {
 		switch s.Description {
@@ -476,6 +473,18 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		killParticipation = float32(p.Kills+p.Assists) / float32(teamKills)
 	}
 
+	position := lolPositionOf(p.TeamPosition)
+	// Dùng killParticipation đã ép float32 để tính lại từ DB (cột REAL) ra đúng điểm này.
+	perfScore := perfScoreOf(perfScoreInput{
+		Position:          position,
+		KillParticipation: float64(killParticipation),
+		Deaths:            p.Deaths,
+		IsWin:             p.Win,
+		GoldEarned:        p.GoldEarned,
+		LaneOpponentGold:  laneOpponentGold,
+		DurationSec:       durationSec,
+	})
+
 	return db.InsertMatchParticipantsParams{
 		MatchID:              matchId,
 		Team:                 teamOf(p.TeamId),
@@ -486,7 +495,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		RankPower:            shared.PgInt4(rankPower),
 		ChampionID:           int32(p.ChampionId),
 		ChampLevel:           int16(p.ChampLevel),
-		Position:             string(lolPositionOf(p.TeamPosition)),
+		Position:             string(position),
 		Kills:                int16(p.Kills),
 		Deaths:               int16(p.Deaths),
 		Assists:              int16(p.Assists),
@@ -502,7 +511,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		TrueDmgToChamps:      int32(p.TrueDamageDealtToChampions),
 		DmgTaken:             int32(p.TotalDamageTaken),
 		VisionScore:          int32(p.VisionScore),
-		PerfScore:            defaultPerfScore,
+		PerfScore:            perfScore,
 		// sort để Flash+Ignite == Ignite+Flash khi GROUP BY
 		Spell1ID:         int16(min(p.Summoner1Id, p.Summoner2Id)),
 		Spell2ID:         int16(max(p.Summoner1Id, p.Summoner2Id)),

@@ -14,7 +14,7 @@ import (
 )
 
 // Số match gọi song song mỗi lượt trong GetMatchesByIds, tránh bị rate limit.
-const matchFetchBatchSize = 5
+const matchFetchBatchSize = 4
 
 // region: americas | asia | europe | sea (account-v1, match-v5)
 // platform: vn2 | kr | na1 | euw1 | ... (league-v4, summoner-v4)
