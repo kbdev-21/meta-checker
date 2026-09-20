@@ -21,7 +21,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go sched.StartEveryHour(a)
+	go sched.StartUpdateLolDataSched(a)
 
 	fib := fiber.New()
 

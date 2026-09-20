@@ -46,6 +46,12 @@ func DDImgUrl(version string, img DDImage) string {
 	return ddragonBase + "/cdn/" + version + "/img/" + img.Group + "/" + img.Full
 }
 
+// Icon của rune và cây rune nằm ở path riêng, KHÔNG kèm version như DDImgUrl.
+// vd: https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Domination/Electrocute/Electrocute.png
+func DDRuneIconUrl(icon string) string {
+	return ddragonBase + "/cdn/img/" + icon
+}
+
 func (c *DDragonClient) GetCurrentVersion(ctx context.Context) (string, error) {
 	var versions []string
 	err := c.get(ctx, "/api/versions.json", &versions)

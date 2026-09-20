@@ -317,6 +317,73 @@ func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
 	return items, nil
 }
 
+const listRunes = `-- name: ListRunes :many
+SELECT id, style_id, slot, slug, name, short_desc, img_url, patch, updated_at FROM lol_runes ORDER BY style_id NULLS FIRST, slot, id
+`
+
+// Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng.
+func (q *Queries) ListRunes(ctx context.Context) ([]LolRune, error) {
+	rows, err := q.db.Query(ctx, listRunes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LolRune
+	for rows.Next() {
+		var i LolRune
+		if err := rows.Scan(
+			&i.ID,
+			&i.StyleID,
+			&i.Slot,
+			&i.Slug,
+			&i.Name,
+			&i.ShortDesc,
+			&i.ImgUrl,
+			&i.Patch,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpells = `-- name: ListSpells :many
+SELECT id, slug, name, description, img_url, patch, updated_at FROM lol_spells ORDER BY id
+`
+
+func (q *Queries) ListSpells(ctx context.Context) ([]LolSpell, error) {
+	rows, err := q.db.Query(ctx, listSpells)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LolSpell
+	for rows.Next() {
+		var i LolSpell
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Description,
+			&i.ImgUrl,
+			&i.Patch,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchPlayers = `-- name: SearchPlayers :many
 SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players
 WHERE name ILIKE '%' || $1::text || '%'
@@ -534,6 +601,79 @@ func (q *Queries) UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) erro
 		arg.FlexLp,
 		arg.FlexWins,
 		arg.FlexLosses,
+	)
+	return err
+}
+
+const upsertRune = `-- name: UpsertRune :exec
+INSERT INTO lol_runes (id, style_id, slot, slug, name, short_desc, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (id) DO UPDATE SET
+    style_id   = EXCLUDED.style_id,
+    slot       = EXCLUDED.slot,
+    slug       = EXCLUDED.slug,
+    name       = EXCLUDED.name,
+    short_desc = EXCLUDED.short_desc,
+    img_url    = EXCLUDED.img_url,
+    patch      = EXCLUDED.patch,
+    updated_at = now()
+`
+
+type UpsertRuneParams struct {
+	ID        int32       `json:"id"`
+	StyleID   pgtype.Int4 `json:"styleId"`
+	Slot      pgtype.Int4 `json:"slot"`
+	Slug      string      `json:"slug"`
+	Name      string      `json:"name"`
+	ShortDesc string      `json:"shortDesc"`
+	ImgUrl    string      `json:"imgUrl"`
+	Patch     string      `json:"patch"`
+}
+
+// Cây (style_id NULL) phải upsert trước rune của nó vì style_id tham chiếu ngược về chính bảng này.
+func (q *Queries) UpsertRune(ctx context.Context, arg UpsertRuneParams) error {
+	_, err := q.db.Exec(ctx, upsertRune,
+		arg.ID,
+		arg.StyleID,
+		arg.Slot,
+		arg.Slug,
+		arg.Name,
+		arg.ShortDesc,
+		arg.ImgUrl,
+		arg.Patch,
+	)
+	return err
+}
+
+const upsertSpell = `-- name: UpsertSpell :exec
+INSERT INTO lol_spells (id, slug, name, description, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET
+    slug        = EXCLUDED.slug,
+    name        = EXCLUDED.name,
+    description = EXCLUDED.description,
+    img_url     = EXCLUDED.img_url,
+    patch       = EXCLUDED.patch,
+    updated_at  = now()
+`
+
+type UpsertSpellParams struct {
+	ID          int32  `json:"id"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ImgUrl      string `json:"imgUrl"`
+	Patch       string `json:"patch"`
+}
+
+func (q *Queries) UpsertSpell(ctx context.Context, arg UpsertSpellParams) error {
+	_, err := q.db.Exec(ctx, upsertSpell,
+		arg.ID,
+		arg.Slug,
+		arg.Name,
+		arg.Description,
+		arg.ImgUrl,
+		arg.Patch,
 	)
 	return err
 }

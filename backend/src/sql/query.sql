@@ -30,6 +30,38 @@ SELECT * FROM lol_champions ORDER BY name;
 -- name: ListItems :many
 SELECT * FROM lol_items ORDER BY id;
 
+-- name: UpsertSpell :exec
+INSERT INTO lol_spells (id, slug, name, description, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET
+    slug        = EXCLUDED.slug,
+    name        = EXCLUDED.name,
+    description = EXCLUDED.description,
+    img_url     = EXCLUDED.img_url,
+    patch       = EXCLUDED.patch,
+    updated_at  = now();
+
+-- Cây (style_id NULL) phải upsert trước rune của nó vì style_id tham chiếu ngược về chính bảng này.
+-- name: UpsertRune :exec
+INSERT INTO lol_runes (id, style_id, slot, slug, name, short_desc, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (id) DO UPDATE SET
+    style_id   = EXCLUDED.style_id,
+    slot       = EXCLUDED.slot,
+    slug       = EXCLUDED.slug,
+    name       = EXCLUDED.name,
+    short_desc = EXCLUDED.short_desc,
+    img_url    = EXCLUDED.img_url,
+    patch      = EXCLUDED.patch,
+    updated_at = now();
+
+-- name: ListSpells :many
+SELECT * FROM lol_spells ORDER BY id;
+
+-- Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng.
+-- name: ListRunes :many
+SELECT * FROM lol_runes ORDER BY style_id NULLS FIRST, slot, id;
+
 -- Rank solo/flex truyền vào NULL (unknown) thì giữ nguyên cả nhóm cột rank cũ.
 -- name: UpsertPlayer :exec
 INSERT INTO lol_players (

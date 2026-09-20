@@ -22,6 +22,33 @@ CREATE TABLE IF NOT EXISTS lol_items (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS lol_spells (
+    id          INTEGER PRIMARY KEY,               -- ddragon "key" ("4") = spell1_id / spell2_id trong match
+    slug        TEXT        NOT NULL UNIQUE,       -- ddragon "id" ("SummonerFlash")
+    name        TEXT        NOT NULL,
+    description TEXT        NOT NULL DEFAULT '',
+    img_url     TEXT        NOT NULL,              -- URL đầy đủ tới ảnh trên ddragon
+    patch       TEXT        NOT NULL,              -- patch lúc sync, vd "16.18"
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Gộp cả cây rune lẫn rune: hai thứ dùng chung bộ cột, chỉ khác ở chỗ cây không có cha và không có slot.
+CREATE TABLE IF NOT EXISTS lol_runes (
+    id          INTEGER PRIMARY KEY,               -- cây: = rune_primary_style / rune_sub_style trong match
+                                                   -- rune: = key_rune và các phần tử của runes
+    style_id    INTEGER     REFERENCES lol_runes (id) ON DELETE CASCADE,
+                                                   -- NULL = dòng này LÀ một cây; khác NULL = rune thuộc cây đó
+    slot        INTEGER,                           -- hàng trong cây, 0 = hàng keystone; NULL với cây
+    slug        TEXT        NOT NULL UNIQUE,       -- ddragon "key": "Precision" | "Electrocute"
+    name        TEXT        NOT NULL,
+    short_desc  TEXT        NOT NULL DEFAULT '',   -- luôn rỗng với cây
+    img_url     TEXT        NOT NULL,              -- icon rune dùng path không kèm version: /cdn/img/perk-images/...
+    patch       TEXT        NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS lol_runes_style_slot_idx ON lol_runes (style_id, slot);
+
 CREATE TABLE IF NOT EXISTS lol_players (
     id                 TEXT        PRIMARY KEY,           -- puuid, định danh duy nhất toàn cầu của Riot
     server             TEXT        NOT NULL,              -- enum Server của app: VN | KR | EUW | NA ... (KHÔNG phải platform id của Riot)

@@ -8,6 +8,8 @@ import (
 	"backend/src/db"
 	"backend/src/external"
 	"backend/src/shared"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const ddragonLang = "en_US"
@@ -66,6 +68,55 @@ func ToItem(i db.LolItem) Item {
 	}
 }
 
+type Spell struct {
+	Id          int32     `json:"id"`
+	Slug        string    `json:"slug"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	ImgUrl      string    `json:"imgUrl"`
+	Patch       string    `json:"patch"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func ToSpell(s db.LolSpell) Spell {
+	return Spell{
+		Id:          s.ID,
+		Slug:        s.Slug,
+		Name:        s.Name,
+		Description: s.Description,
+		ImgUrl:      s.ImgUrl,
+		Patch:       s.Patch,
+		UpdatedAt:   s.UpdatedAt.Time,
+	}
+}
+
+// Gộp cả cây rune lẫn rune. StyleId IsNull => dòng này là một cây.
+type Rune struct {
+	Id        int32                  `json:"id"`
+	StyleId   shared.Nullable[int32] `json:"styleId"`
+	Slot      shared.Nullable[int32] `json:"slot"`
+	Slug      string                 `json:"slug"`
+	Name      string                 `json:"name"`
+	ShortDesc string                 `json:"shortDesc"`
+	ImgUrl    string                 `json:"imgUrl"`
+	Patch     string                 `json:"patch"`
+	UpdatedAt time.Time              `json:"updatedAt"`
+}
+
+func ToRune(r db.LolRune) Rune {
+	return Rune{
+		Id:        r.ID,
+		StyleId:   shared.NullableInt4(r.StyleID),
+		Slot:      shared.NullableInt4(r.Slot),
+		Slug:      r.Slug,
+		Name:      r.Name,
+		ShortDesc: r.ShortDesc,
+		ImgUrl:    r.ImgUrl,
+		Patch:     r.Patch,
+		UpdatedAt: r.UpdatedAt.Time,
+	}
+}
+
 // ---------- logic ----------
 
 func (a *Application) GetChampions(ctx context.Context) ([]Champion, error) {
@@ -93,6 +144,31 @@ func (a *Application) GetItems(ctx context.Context) ([]Item, error) {
 }
 
 // version đầy đủ của ddragon ("16.18.1") chỉ dùng để dựng URL ảnh; thứ lưu vào DB là patch ("16.18").
+func (a *Application) GetSpells(ctx context.Context) ([]Spell, error) {
+	rows, err := a.q.ListSpells(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []Spell{}
+	for _, r := range rows {
+		out = append(out, ToSpell(r))
+	}
+	return out, nil
+}
+
+// Cây trước, rồi rune của từng cây theo thứ tự hàng.
+func (a *Application) GetRunes(ctx context.Context) ([]Rune, error) {
+	rows, err := a.q.ListRunes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []Rune{}
+	for _, r := range rows {
+		out = append(out, ToRune(r))
+	}
+	return out, nil
+}
+
 func (a *Application) UpdateChampions(ctx context.Context) error {
 	version, err := a.ddragon.GetCurrentVersion(ctx)
 	if err != nil {
@@ -179,6 +255,98 @@ func (a *Application) UpdateItems(ctx context.Context) error {
 		})
 		if err != nil {
 			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// Xem UpdateChampions về version vs patch.
+func (a *Application) UpdateSpells(ctx context.Context) error {
+	version, err := a.ddragon.GetCurrentVersion(ctx)
+	if err != nil {
+		return err
+	}
+	spells, err := a.ddragon.GetSummonerSpells(ctx, version, ddragonLang)
+	if err != nil {
+		return err
+	}
+
+	tx, err := a.p.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	q := a.q.WithTx(tx)
+
+	for _, sp := range spells {
+		id, err := strconv.Atoi(sp.Key)
+		if err != nil {
+			return err
+		}
+		err = q.UpsertSpell(ctx, db.UpsertSpellParams{
+			ID:          int32(id),
+			Slug:        sp.Id,
+			Name:        sp.Name,
+			Description: sp.Description,
+			ImgUrl:      external.DDImgUrl(version, sp.Image),
+			Patch:       shared.PatchOf(version),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// Lưu cả cây rune lẫn rune vào lol_runes. Cây phải upsert trước rune của nó vì style_id
+// tham chiếu ngược về chính bảng này.
+// Xem UpdateChampions về version vs patch.
+func (a *Application) UpdateRunes(ctx context.Context) error {
+	version, err := a.ddragon.GetCurrentVersion(ctx)
+	if err != nil {
+		return err
+	}
+	trees, err := a.ddragon.GetRunes(ctx, version, ddragonLang)
+	if err != nil {
+		return err
+	}
+
+	tx, err := a.p.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	q := a.q.WithTx(tx)
+	patch := shared.PatchOf(version)
+
+	for _, t := range trees {
+		err = q.UpsertRune(ctx, db.UpsertRuneParams{
+			ID:     int32(t.Id),
+			Slug:   t.Key,
+			Name:   t.Name,
+			ImgUrl: external.DDRuneIconUrl(t.Icon),
+			Patch:  patch,
+			// StyleID / Slot bỏ trống: đây là cây, không thuộc cây nào.
+		})
+		if err != nil {
+			return err
+		}
+		for slot, s := range t.Slots {
+			for _, r := range s.Runes {
+				err = q.UpsertRune(ctx, db.UpsertRuneParams{
+					ID:        int32(r.Id),
+					StyleID:   pgtype.Int4{Int32: int32(t.Id), Valid: true},
+					Slot:      pgtype.Int4{Int32: int32(slot), Valid: true},
+					Slug:      r.Key,
+					Name:      r.Name,
+					ShortDesc: r.ShortDesc,
+					ImgUrl:    external.DDRuneIconUrl(r.Icon),
+					Patch:     patch,
+				})
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return tx.Commit(ctx)

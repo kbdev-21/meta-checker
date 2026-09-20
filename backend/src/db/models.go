@@ -118,3 +118,25 @@ type LolPlayer struct {
 	CreatedAt       pgtype.Timestamptz `json:"createdAt"`
 	UpdatedAt       pgtype.Timestamptz `json:"updatedAt"`
 }
+
+type LolRune struct {
+	ID        int32              `json:"id"`
+	StyleID   pgtype.Int4        `json:"styleId"`
+	Slot      pgtype.Int4        `json:"slot"`
+	Slug      string             `json:"slug"`
+	Name      string             `json:"name"`
+	ShortDesc string             `json:"shortDesc"`
+	ImgUrl    string             `json:"imgUrl"`
+	Patch     string             `json:"patch"`
+	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
+}
+
+type LolSpell struct {
+	ID          int32              `json:"id"`
+	Slug        string             `json:"slug"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	ImgUrl      string             `json:"imgUrl"`
+	Patch       string             `json:"patch"`
+	UpdatedAt   pgtype.Timestamptz `json:"updatedAt"`
+}
