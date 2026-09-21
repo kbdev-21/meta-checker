@@ -12,7 +12,7 @@ import (
 )
 
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
-SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, gold_earned, minions_killed, neutral_minions_killed, cs, dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
+SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
 ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id
 `
@@ -43,16 +43,29 @@ func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds [
 			&i.Assists,
 			&i.Kda,
 			&i.KillParticipation,
-			&i.GoldEarned,
+			&i.DoubleKills,
+			&i.TripleKills,
+			&i.QuadraKills,
+			&i.PentaKills,
+			&i.Gold,
+			&i.GoldPerMin,
 			&i.MinionsKilled,
 			&i.NeutralMinionsKilled,
 			&i.Cs,
-			&i.DmgToChamps,
-			&i.PhysicalDmgToChamps,
-			&i.MagicDmgToChamps,
-			&i.TrueDmgToChamps,
+			&i.CsPerMin,
+			&i.DmgDealt,
+			&i.DmgPerMin,
+			&i.PhysicalDmgDealt,
+			&i.MagicDmgDealt,
+			&i.TrueDmgDealt,
+			&i.DmgToTurrets,
 			&i.DmgTaken,
+			&i.Heal,
+			&i.HealOthers,
+			&i.ShieldOthers,
 			&i.VisionScore,
+			&i.WardsPlaced,
+			&i.WardsKilled,
 			&i.PerfScore,
 			&i.Spell1ID,
 			&i.Spell2ID,
@@ -121,7 +134,7 @@ func (q *Queries) GetMatchesByIds(ctx context.Context, ids []string) ([]LolMatch
 }
 
 const getPlayerById = `-- name: GetPlayerById :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = $1
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, created_at, updated_at FROM lol_players WHERE id = $1
 `
 
 func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, error) {
@@ -148,8 +161,6 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, erro
 		&i.FlexLp,
 		&i.FlexWins,
 		&i.FlexLosses,
-		&i.LastMatchAt,
-		&i.MatchesSyncedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -157,7 +168,7 @@ func (q *Queries) GetPlayerById(ctx context.Context, id string) (LolPlayer, erro
 }
 
 const getPlayerByServerNameAndTag = `-- name: GetPlayerByServerNameAndTag :one
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, created_at, updated_at FROM lol_players WHERE server = $1 AND normalized_name = $2 AND normalized_tag = $3
 `
 
 type GetPlayerByServerNameAndTagParams struct {
@@ -191,8 +202,6 @@ func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayer
 		&i.FlexLp,
 		&i.FlexWins,
 		&i.FlexLosses,
-		&i.LastMatchAt,
-		&i.MatchesSyncedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -200,7 +209,7 @@ func (q *Queries) GetPlayerByServerNameAndTag(ctx context.Context, arg GetPlayer
 }
 
 const getPlayersByIds = `-- name: GetPlayersByIds :many
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players WHERE id = ANY($1::text[])
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, created_at, updated_at FROM lol_players WHERE id = ANY($1::text[])
 `
 
 // Id không có trong DB thì bỏ qua.
@@ -234,8 +243,6 @@ func (q *Queries) GetPlayersByIds(ctx context.Context, ids []string) ([]LolPlaye
 			&i.FlexLp,
 			&i.FlexWins,
 			&i.FlexLosses,
-			&i.LastMatchAt,
-			&i.MatchesSyncedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -385,7 +392,7 @@ func (q *Queries) ListSpells(ctx context.Context) ([]LolSpell, error) {
 }
 
 const searchPlayers = `-- name: SearchPlayers :many
-SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, last_match_at, matches_synced_at, created_at, updated_at FROM lol_players
+SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, created_at, updated_at FROM lol_players
 WHERE name ILIKE '%' || $1::text || '%'
    OR tag ILIKE '%' || $1::text || '%'
    OR search_string LIKE '%' || $2::text || '%'
@@ -429,8 +436,6 @@ func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([
 			&i.FlexLp,
 			&i.FlexWins,
 			&i.FlexLosses,
-			&i.LastMatchAt,
-			&i.MatchesSyncedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

@@ -133,16 +133,20 @@ INSERT INTO lol_match_participants (
     name, tag, rank_power,
     champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
-    gold_earned, minions_killed, neutral_minions_killed, cs,
-    dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
+    double_kills, triple_kills, quadra_kills, penta_kills,
+    gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min,
+    dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets,
+    dmg_taken, heal, heal_others, shield_others,
+    vision_score, wards_placed, wards_killed,
     perf_score,
     spell1_id, spell2_id,
     rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
     items
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
+    $39, $40, $41, $42, $43, $44, $45, $46, $47, $48
 )
 ON CONFLICT (match_id, player_id) DO NOTHING;
 

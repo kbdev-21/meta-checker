@@ -71,16 +71,29 @@ type LolMatchParticipant struct {
 	Assists              int16       `json:"assists"`
 	Kda                  float32     `json:"kda"`
 	KillParticipation    float32     `json:"killParticipation"`
-	GoldEarned           int32       `json:"goldEarned"`
+	DoubleKills          int16       `json:"doubleKills"`
+	TripleKills          int16       `json:"tripleKills"`
+	QuadraKills          int16       `json:"quadraKills"`
+	PentaKills           int16       `json:"pentaKills"`
+	Gold                 int32       `json:"gold"`
+	GoldPerMin           float32     `json:"goldPerMin"`
 	MinionsKilled        int32       `json:"minionsKilled"`
 	NeutralMinionsKilled int32       `json:"neutralMinionsKilled"`
 	Cs                   int32       `json:"cs"`
-	DmgToChamps          int32       `json:"dmgToChamps"`
-	PhysicalDmgToChamps  int32       `json:"physicalDmgToChamps"`
-	MagicDmgToChamps     int32       `json:"magicDmgToChamps"`
-	TrueDmgToChamps      int32       `json:"trueDmgToChamps"`
+	CsPerMin             float32     `json:"csPerMin"`
+	DmgDealt             int32       `json:"dmgDealt"`
+	DmgPerMin            float32     `json:"dmgPerMin"`
+	PhysicalDmgDealt     int32       `json:"physicalDmgDealt"`
+	MagicDmgDealt        int32       `json:"magicDmgDealt"`
+	TrueDmgDealt         int32       `json:"trueDmgDealt"`
+	DmgToTurrets         int32       `json:"dmgToTurrets"`
 	DmgTaken             int32       `json:"dmgTaken"`
+	Heal                 int32       `json:"heal"`
+	HealOthers           int32       `json:"healOthers"`
+	ShieldOthers         int32       `json:"shieldOthers"`
 	VisionScore          int32       `json:"visionScore"`
+	WardsPlaced          int32       `json:"wardsPlaced"`
+	WardsKilled          int32       `json:"wardsKilled"`
 	PerfScore            int32       `json:"perfScore"`
 	Spell1ID             int16       `json:"spell1Id"`
 	Spell2ID             int16       `json:"spell2Id"`
@@ -93,30 +106,28 @@ type LolMatchParticipant struct {
 }
 
 type LolPlayer struct {
-	ID              string             `json:"id"`
-	Server          string             `json:"server"`
-	Name            string             `json:"name"`
-	Tag             string             `json:"tag"`
-	NormalizedName  string             `json:"normalizedName"`
-	NormalizedTag   string             `json:"normalizedTag"`
-	ProfileIconID   pgtype.Int4        `json:"profileIconId"`
-	Level           pgtype.Int4        `json:"level"`
-	SearchString    string             `json:"searchString"`
-	SoloRank        pgtype.Text        `json:"soloRank"`
-	SoloTier        pgtype.Text        `json:"soloTier"`
-	SoloLp          int32              `json:"soloLp"`
-	SoloRankPower   pgtype.Int4        `json:"soloRankPower"`
-	SoloWins        int32              `json:"soloWins"`
-	SoloLosses      int32              `json:"soloLosses"`
-	FlexRank        pgtype.Text        `json:"flexRank"`
-	FlexTier        pgtype.Text        `json:"flexTier"`
-	FlexLp          int32              `json:"flexLp"`
-	FlexWins        int32              `json:"flexWins"`
-	FlexLosses      int32              `json:"flexLosses"`
-	LastMatchAt     pgtype.Timestamptz `json:"lastMatchAt"`
-	MatchesSyncedAt pgtype.Timestamptz `json:"matchesSyncedAt"`
-	CreatedAt       pgtype.Timestamptz `json:"createdAt"`
-	UpdatedAt       pgtype.Timestamptz `json:"updatedAt"`
+	ID             string             `json:"id"`
+	Server         string             `json:"server"`
+	Name           string             `json:"name"`
+	Tag            string             `json:"tag"`
+	NormalizedName string             `json:"normalizedName"`
+	NormalizedTag  string             `json:"normalizedTag"`
+	ProfileIconID  pgtype.Int4        `json:"profileIconId"`
+	Level          pgtype.Int4        `json:"level"`
+	SearchString   string             `json:"searchString"`
+	SoloRank       pgtype.Text        `json:"soloRank"`
+	SoloTier       pgtype.Text        `json:"soloTier"`
+	SoloLp         int32              `json:"soloLp"`
+	SoloRankPower  pgtype.Int4        `json:"soloRankPower"`
+	SoloWins       int32              `json:"soloWins"`
+	SoloLosses     int32              `json:"soloLosses"`
+	FlexRank       pgtype.Text        `json:"flexRank"`
+	FlexTier       pgtype.Text        `json:"flexTier"`
+	FlexLp         int32              `json:"flexLp"`
+	FlexWins       int32              `json:"flexWins"`
+	FlexLosses     int32              `json:"flexLosses"`
+	CreatedAt      pgtype.Timestamptz `json:"createdAt"`
+	UpdatedAt      pgtype.Timestamptz `json:"updatedAt"`
 }
 
 type LolRune struct {

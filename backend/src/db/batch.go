@@ -23,16 +23,20 @@ INSERT INTO lol_match_participants (
     name, tag, rank_power,
     champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
-    gold_earned, minions_killed, neutral_minions_killed, cs,
-    dmg_to_champs, physical_dmg_to_champs, magic_dmg_to_champs, true_dmg_to_champs, dmg_taken, vision_score,
+    double_kills, triple_kills, quadra_kills, penta_kills,
+    gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min,
+    dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets,
+    dmg_taken, heal, heal_others, shield_others,
+    vision_score, wards_placed, wards_killed,
     perf_score,
     spell1_id, spell2_id,
     rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
     items
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-    $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
+    $39, $40, $41, $42, $43, $44, $45, $46, $47, $48
 )
 ON CONFLICT (match_id, player_id) DO NOTHING
 `
@@ -60,16 +64,29 @@ type InsertMatchParticipantsParams struct {
 	Assists              int16       `json:"assists"`
 	Kda                  float32     `json:"kda"`
 	KillParticipation    float32     `json:"killParticipation"`
-	GoldEarned           int32       `json:"goldEarned"`
+	DoubleKills          int16       `json:"doubleKills"`
+	TripleKills          int16       `json:"tripleKills"`
+	QuadraKills          int16       `json:"quadraKills"`
+	PentaKills           int16       `json:"pentaKills"`
+	Gold                 int32       `json:"gold"`
+	GoldPerMin           float32     `json:"goldPerMin"`
 	MinionsKilled        int32       `json:"minionsKilled"`
 	NeutralMinionsKilled int32       `json:"neutralMinionsKilled"`
 	Cs                   int32       `json:"cs"`
-	DmgToChamps          int32       `json:"dmgToChamps"`
-	PhysicalDmgToChamps  int32       `json:"physicalDmgToChamps"`
-	MagicDmgToChamps     int32       `json:"magicDmgToChamps"`
-	TrueDmgToChamps      int32       `json:"trueDmgToChamps"`
+	CsPerMin             float32     `json:"csPerMin"`
+	DmgDealt             int32       `json:"dmgDealt"`
+	DmgPerMin            float32     `json:"dmgPerMin"`
+	PhysicalDmgDealt     int32       `json:"physicalDmgDealt"`
+	MagicDmgDealt        int32       `json:"magicDmgDealt"`
+	TrueDmgDealt         int32       `json:"trueDmgDealt"`
+	DmgToTurrets         int32       `json:"dmgToTurrets"`
 	DmgTaken             int32       `json:"dmgTaken"`
+	Heal                 int32       `json:"heal"`
+	HealOthers           int32       `json:"healOthers"`
+	ShieldOthers         int32       `json:"shieldOthers"`
 	VisionScore          int32       `json:"visionScore"`
+	WardsPlaced          int32       `json:"wardsPlaced"`
+	WardsKilled          int32       `json:"wardsKilled"`
 	PerfScore            int32       `json:"perfScore"`
 	Spell1ID             int16       `json:"spell1Id"`
 	Spell2ID             int16       `json:"spell2Id"`
@@ -102,16 +119,29 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.Assists,
 			a.Kda,
 			a.KillParticipation,
-			a.GoldEarned,
+			a.DoubleKills,
+			a.TripleKills,
+			a.QuadraKills,
+			a.PentaKills,
+			a.Gold,
+			a.GoldPerMin,
 			a.MinionsKilled,
 			a.NeutralMinionsKilled,
 			a.Cs,
-			a.DmgToChamps,
-			a.PhysicalDmgToChamps,
-			a.MagicDmgToChamps,
-			a.TrueDmgToChamps,
+			a.CsPerMin,
+			a.DmgDealt,
+			a.DmgPerMin,
+			a.PhysicalDmgDealt,
+			a.MagicDmgDealt,
+			a.TrueDmgDealt,
+			a.DmgToTurrets,
 			a.DmgTaken,
+			a.Heal,
+			a.HealOthers,
+			a.ShieldOthers,
 			a.VisionScore,
+			a.WardsPlaced,
+			a.WardsKilled,
 			a.PerfScore,
 			a.Spell1ID,
 			a.Spell2ID,

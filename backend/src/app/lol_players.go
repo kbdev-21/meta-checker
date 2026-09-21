@@ -22,52 +22,48 @@ const playerUpdateInterval = 2 * time.Minute
 // ---------- entity ----------
 
 type Player struct {
-	Id              string                     `json:"id"`
-	Server          Server                     `json:"server"`
-	Name            string                     `json:"name"`
-	Tag             string                     `json:"tag"`
-	ProfileIconId   shared.Nullable[int32]     `json:"profileIconId"`
-	Level           shared.Nullable[int32]     `json:"level"`
-	SoloRank        shared.Nullable[Rank]      `json:"soloRank"`
-	SoloTier        shared.Nullable[Tier]      `json:"soloTier"`
-	SoloLp          int32                      `json:"soloLp"`
-	SoloRankPower   shared.Nullable[int32]     `json:"soloRankPower"`
-	SoloWins        int32                      `json:"soloWins"`
-	SoloLosses      int32                      `json:"soloLosses"`
-	FlexRank        shared.Nullable[Rank]      `json:"flexRank"`
-	FlexTier        shared.Nullable[Tier]      `json:"flexTier"`
-	FlexLp          int32                      `json:"flexLp"`
-	FlexWins        int32                      `json:"flexWins"`
-	FlexLosses      int32                      `json:"flexLosses"`
-	LastMatchAt     shared.Nullable[time.Time] `json:"lastMatchAt"`
-	MatchesSyncedAt shared.Nullable[time.Time] `json:"matchesSyncedAt"`
-	CreatedAt       time.Time                  `json:"createdAt"`
-	UpdatedAt       time.Time                  `json:"updatedAt"`
+	Id            string                 `json:"id"`
+	Server        Server                 `json:"server"`
+	Name          string                 `json:"name"`
+	Tag           string                 `json:"tag"`
+	ProfileIconId shared.Nullable[int32] `json:"profileIconId"`
+	Level         shared.Nullable[int32] `json:"level"`
+	SoloRank      shared.Nullable[Rank]  `json:"soloRank"`
+	SoloTier      shared.Nullable[Tier]  `json:"soloTier"`
+	SoloLp        int32                  `json:"soloLp"`
+	SoloRankPower shared.Nullable[int32] `json:"soloRankPower"`
+	SoloWins      int32                  `json:"soloWins"`
+	SoloLosses    int32                  `json:"soloLosses"`
+	FlexRank      shared.Nullable[Rank]  `json:"flexRank"`
+	FlexTier      shared.Nullable[Tier]  `json:"flexTier"`
+	FlexLp        int32                  `json:"flexLp"`
+	FlexWins      int32                  `json:"flexWins"`
+	FlexLosses    int32                  `json:"flexLosses"`
+	CreatedAt     time.Time              `json:"createdAt"`
+	UpdatedAt     time.Time              `json:"updatedAt"`
 }
 
 func ToPlayer(p db.LolPlayer) Player {
 	return Player{
-		Id:              p.ID,
-		Server:          Server(p.Server),
-		Name:            p.Name,
-		Tag:             p.Tag,
-		ProfileIconId:   shared.NullableInt4(p.ProfileIconID),
-		Level:           shared.NullableInt4(p.Level),
-		SoloRank:        shared.NullableText[Rank](p.SoloRank),
-		SoloTier:        shared.NullableText[Tier](p.SoloTier),
-		SoloLp:          p.SoloLp,
-		SoloRankPower:   shared.NullableInt4(p.SoloRankPower),
-		SoloWins:        p.SoloWins,
-		SoloLosses:      p.SoloLosses,
-		FlexRank:        shared.NullableText[Rank](p.FlexRank),
-		FlexTier:        shared.NullableText[Tier](p.FlexTier),
-		FlexLp:          p.FlexLp,
-		FlexWins:        p.FlexWins,
-		FlexLosses:      p.FlexLosses,
-		LastMatchAt:     shared.NullableTime(p.LastMatchAt),
-		MatchesSyncedAt: shared.NullableTime(p.MatchesSyncedAt),
-		CreatedAt:       p.CreatedAt.Time,
-		UpdatedAt:       p.UpdatedAt.Time,
+		Id:            p.ID,
+		Server:        Server(p.Server),
+		Name:          p.Name,
+		Tag:           p.Tag,
+		ProfileIconId: shared.NullableInt4(p.ProfileIconID),
+		Level:         shared.NullableInt4(p.Level),
+		SoloRank:      shared.NullableText[Rank](p.SoloRank),
+		SoloTier:      shared.NullableText[Tier](p.SoloTier),
+		SoloLp:        p.SoloLp,
+		SoloRankPower: shared.NullableInt4(p.SoloRankPower),
+		SoloWins:      p.SoloWins,
+		SoloLosses:    p.SoloLosses,
+		FlexRank:      shared.NullableText[Rank](p.FlexRank),
+		FlexTier:      shared.NullableText[Tier](p.FlexTier),
+		FlexLp:        p.FlexLp,
+		FlexWins:      p.FlexWins,
+		FlexLosses:    p.FlexLosses,
+		CreatedAt:     p.CreatedAt.Time,
+		UpdatedAt:     p.UpdatedAt.Time,
 	}
 }
 

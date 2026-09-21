@@ -79,16 +79,29 @@ type MatchParticipant struct {
 	Assists              int16                  `json:"assists"`
 	Kda                  float32                `json:"kda"`
 	KillParticipation    float32                `json:"killParticipation"`
-	GoldEarned           int32                  `json:"goldEarned"`
+	DoubleKills          int16                  `json:"doubleKills"`
+	TripleKills          int16                  `json:"tripleKills"`
+	QuadraKills          int16                  `json:"quadraKills"`
+	PentaKills           int16                  `json:"pentaKills"`
+	Gold                 int32                  `json:"gold"`
+	GoldPerMin           float32                `json:"goldPerMin"`
 	MinionsKilled        int32                  `json:"minionsKilled"`
 	NeutralMinionsKilled int32                  `json:"neutralMinionsKilled"`
 	Cs                   int32                  `json:"cs"`
-	DmgToChamps          int32                  `json:"dmgToChamps"`
-	PhysicalDmgToChamps  int32                  `json:"physicalDmgToChamps"`
-	MagicDmgToChamps     int32                  `json:"magicDmgToChamps"`
-	TrueDmgToChamps      int32                  `json:"trueDmgToChamps"`
+	CsPerMin             float32                `json:"csPerMin"`
+	DmgDealt             int32                  `json:"dmgDealt"`
+	DmgPerMin            float32                `json:"dmgPerMin"`
+	PhysicalDmgDealt     int32                  `json:"physicalDmgDealt"`
+	MagicDmgDealt        int32                  `json:"magicDmgDealt"`
+	TrueDmgDealt         int32                  `json:"trueDmgDealt"`
+	DmgToTurrets         int32                  `json:"dmgToTurrets"`
 	DmgTaken             int32                  `json:"dmgTaken"`
+	Heal                 int32                  `json:"heal"`
+	HealOthers           int32                  `json:"healOthers"`
+	ShieldOthers         int32                  `json:"shieldOthers"`
 	VisionScore          int32                  `json:"visionScore"`
+	WardsPlaced          int32                  `json:"wardsPlaced"`
+	WardsKilled          int32                  `json:"wardsKilled"`
 	PerfScore            int32                  `json:"perfScore"`
 	Spell1Id             int16                  `json:"spell1Id"`
 	Spell2Id             int16                  `json:"spell2Id"`
@@ -117,16 +130,29 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		Assists:              p.Assists,
 		Kda:                  p.Kda,
 		KillParticipation:    p.KillParticipation,
-		GoldEarned:           p.GoldEarned,
+		DoubleKills:          p.DoubleKills,
+		TripleKills:          p.TripleKills,
+		QuadraKills:          p.QuadraKills,
+		PentaKills:           p.PentaKills,
+		Gold:                 p.Gold,
+		GoldPerMin:           p.GoldPerMin,
 		MinionsKilled:        p.MinionsKilled,
 		NeutralMinionsKilled: p.NeutralMinionsKilled,
 		Cs:                   p.Cs,
-		DmgToChamps:          p.DmgToChamps,
-		PhysicalDmgToChamps:  p.PhysicalDmgToChamps,
-		MagicDmgToChamps:     p.MagicDmgToChamps,
-		TrueDmgToChamps:      p.TrueDmgToChamps,
+		CsPerMin:             p.CsPerMin,
+		DmgDealt:             p.DmgDealt,
+		DmgPerMin:            p.DmgPerMin,
+		PhysicalDmgDealt:     p.PhysicalDmgDealt,
+		MagicDmgDealt:        p.MagicDmgDealt,
+		TrueDmgDealt:         p.TrueDmgDealt,
+		DmgToTurrets:         p.DmgToTurrets,
 		DmgTaken:             p.DmgTaken,
+		Heal:                 p.Heal,
+		HealOthers:           p.HealOthers,
+		ShieldOthers:         p.ShieldOthers,
 		VisionScore:          p.VisionScore,
+		WardsPlaced:          p.WardsPlaced,
+		WardsKilled:          p.WardsKilled,
 		PerfScore:            p.PerfScore,
 		Spell1Id:             p.Spell1ID,
 		Spell2Id:             p.Spell2ID,
@@ -282,6 +308,15 @@ func teamOf(riotTeamId int) int16 {
 	return int16(riotTeamId / 100)
 }
 
+// Giá trị trên mỗi phút, để so được giữa các trận dài ngắn khác nhau.
+// Duration <= 0 (dữ liệu lỗi) => 0.
+func perMinuteOf(value int, durationSec int32) float32 {
+	if durationSec <= 0 {
+		return 0
+	}
+	return float32(value) * 60 / float32(durationSec)
+}
+
 func puuidsOf(match *external.MatchDto) []string {
 	out := make([]string, 0, len(match.Info.Participants))
 	for _, p := range match.Info.Participants {
@@ -416,6 +451,8 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		DurationSec:       durationSec,
 	})
 
+	cs := p.TotalMinionsKilled + p.NeutralMinionsKilled
+
 	return db.InsertMatchParticipantsParams{
 		MatchID:              matchId,
 		Team:                 teamOf(p.TeamId),
@@ -433,16 +470,29 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		Assists:              int16(p.Assists),
 		Kda:                  float32(p.Kills+p.Assists) / float32(max(p.Deaths, 1)),
 		KillParticipation:    killParticipation,
-		GoldEarned:           int32(p.GoldEarned),
+		DoubleKills:          int16(p.DoubleKills),
+		TripleKills:          int16(p.TripleKills),
+		QuadraKills:          int16(p.QuadraKills),
+		PentaKills:           int16(p.PentaKills),
+		Gold:                 int32(p.GoldEarned),
+		GoldPerMin:           perMinuteOf(p.GoldEarned, durationSec),
 		MinionsKilled:        int32(p.TotalMinionsKilled),
 		NeutralMinionsKilled: int32(p.NeutralMinionsKilled),
-		Cs:                   int32(p.TotalMinionsKilled + p.NeutralMinionsKilled),
-		DmgToChamps:          int32(p.TotalDamageDealtToChampions),
-		PhysicalDmgToChamps:  int32(p.PhysicalDamageDealtToChampions),
-		MagicDmgToChamps:     int32(p.MagicDamageDealtToChampions),
-		TrueDmgToChamps:      int32(p.TrueDamageDealtToChampions),
+		Cs:                   int32(cs),
+		CsPerMin:             perMinuteOf(cs, durationSec),
+		DmgDealt:             int32(p.TotalDamageDealtToChampions),
+		DmgPerMin:            perMinuteOf(p.TotalDamageDealtToChampions, durationSec),
+		PhysicalDmgDealt:     int32(p.PhysicalDamageDealtToChampions),
+		MagicDmgDealt:        int32(p.MagicDamageDealtToChampions),
+		TrueDmgDealt:         int32(p.TrueDamageDealtToChampions),
+		DmgToTurrets:         int32(p.DamageDealtToTurrets),
 		DmgTaken:             int32(p.TotalDamageTaken),
+		Heal:                 int32(p.TotalHeal),
+		HealOthers:           int32(p.TotalHealsOnTeammates),
+		ShieldOthers:         int32(p.TotalDamageShieldedOnTeammates),
 		VisionScore:          int32(p.VisionScore),
+		WardsPlaced:          int32(p.WardsPlaced),
+		WardsKilled:          int32(p.WardsKilled),
 		PerfScore:            perfScore,
 		// sort để Flash+Ignite == Ignite+Flash khi GROUP BY
 		Spell1ID:         int16(min(p.Summoner1Id, p.Summoner2Id)),

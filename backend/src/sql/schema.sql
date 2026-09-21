@@ -75,15 +75,10 @@ CREATE TABLE IF NOT EXISTS lol_players (
     flex_wins          INTEGER     NOT NULL DEFAULT 0,
     flex_losses        INTEGER     NOT NULL DEFAULT 0,
 
-    -- phục vụ crawl match
-    last_match_at      TIMESTAMPTZ,                       -- thời điểm kết thúc của match mới nhất đã lấy, dùng làm startTime cho lần sau
-    matches_synced_at  TIMESTAMPTZ,                       -- lần cuối gọi match-v5 cho player này
-
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS lol_players_matches_synced_at_idx ON lol_players (matches_synced_at NULLS FIRST);
 CREATE INDEX IF NOT EXISTS lol_players_normalized_name_tag_idx ON lol_players (normalized_name, normalized_tag);
 
 CREATE TABLE IF NOT EXISTS lol_matches (
@@ -134,18 +129,31 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     assists                SMALLINT  NOT NULL,
     kda                    REAL      NOT NULL,         -- (kills + assists) / max(deaths, 1), tính trong app
     kill_participation     REAL      NOT NULL,         -- (kills + assists) / team kills, tính trong app; 0 nếu team 0 kill
+    double_kills           SMALLINT  NOT NULL,
+    triple_kills           SMALLINT  NOT NULL,
+    quadra_kills           SMALLINT  NOT NULL,
+    penta_kills            SMALLINT  NOT NULL,
 
-    gold_earned            INTEGER   NOT NULL,
+    gold                   INTEGER   NOT NULL,
+    gold_per_min           REAL      NOT NULL,         -- gold / phút, tính trong app
     minions_killed         INTEGER   NOT NULL,
     neutral_minions_killed INTEGER   NOT NULL,
     cs                     INTEGER   NOT NULL,         -- minions_killed + neutral_minions_killed, tính trong app
+    cs_per_min             REAL      NOT NULL,         -- cs / phút, tính trong app
 
-    dmg_to_champs          INTEGER   NOT NULL,         -- totalDamageDealtToChampions
-    physical_dmg_to_champs INTEGER   NOT NULL,         -- physicalDamageDealtToChampions
-    magic_dmg_to_champs    INTEGER   NOT NULL,         -- magicDamageDealtToChampions
-    true_dmg_to_champs     INTEGER   NOT NULL,         -- trueDamageDealtToChampions
+    dmg_dealt              INTEGER   NOT NULL,         -- totalDamageDealtToChampions
+    dmg_per_min            REAL      NOT NULL,         -- dmg_dealt / phút, tính trong app
+    physical_dmg_dealt     INTEGER   NOT NULL,         -- physicalDamageDealtToChampions
+    magic_dmg_dealt        INTEGER   NOT NULL,         -- magicDamageDealtToChampions
+    true_dmg_dealt         INTEGER   NOT NULL,         -- trueDamageDealtToChampions
+    dmg_to_turrets         INTEGER   NOT NULL,         -- damageDealtToTurrets
     dmg_taken              INTEGER   NOT NULL,         -- totalDamageTaken
+    heal                   INTEGER   NOT NULL,         -- totalHeal, gồm cả tự hồi (lifesteal, hồi máu, bình máu)
+    heal_others            INTEGER   NOT NULL,         -- totalHealsOnTeammates, chỉ phần hồi cho đồng đội
+    shield_others          INTEGER   NOT NULL,         -- totalDamageShieldedOnTeammates
     vision_score           INTEGER   NOT NULL,
+    wards_placed           INTEGER   NOT NULL,
+    wards_killed           INTEGER   NOT NULL,
 
     perf_score             INTEGER   NOT NULL,         -- điểm hiệu suất, công thức riêng tính trong app
 

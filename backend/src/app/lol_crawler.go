@@ -5,6 +5,7 @@ import (
 	"backend/src/shared"
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -52,7 +53,7 @@ func (a *Application) CrawlMatches(ctx context.Context, crawler *Crawler) error 
 		time.Sleep(crawlFreq)
 	}
 
-	fmt.Printf("Crawler server %s: %d/%d players\n", crawler.Server, success, crawlBatch)
+	log.Printf("Crawler server %s: %d/%d players\n", crawler.Server, success, crawlBatch)
 	crawler.idx = end
 
 	// Hết một vòng thì lấy lại ladder. Reset lỗi thì puuids cũ được giữ nguyên và idx vẫn bằng
@@ -124,7 +125,7 @@ func (a *Application) resetCrawlPuuids(ctx context.Context, crawler *Crawler) er
 	wg.Wait()
 
 	if len(chal) == 0 || len(gm) == 0 || len(master) == 0 {
-		fmt.Printf("Crawler server %s: reset puuids failed\n", crawler.Server)
+		log.Printf("Crawler server %s: reset puuids failed\n", crawler.Server)
 		return fmt.Errorf("fetch puuids failed for crawler %s", string(crawler.Server))
 	}
 
@@ -134,7 +135,7 @@ func (a *Application) resetCrawlPuuids(ctx context.Context, crawler *Crawler) er
 	crawler.puuids = append(crawler.puuids, gm...)
 	crawler.puuids = append(crawler.puuids, master...)
 
-	fmt.Printf("Crawler server %s: reset %d puuids\n", crawler.Server, len(crawler.puuids))
+	log.Printf("Crawler server %s: reset %d puuids\n", crawler.Server, len(crawler.puuids))
 
 	return nil
 }

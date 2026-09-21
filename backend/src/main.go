@@ -5,8 +5,6 @@ import (
 	"backend/src/config"
 	"backend/src/router"
 	"backend/src/sched"
-	"fmt"
-	"time"
 
 	//"backend/src/sched"
 	"context"
@@ -25,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//sched.StartUpdateLolDataSched(a)
+	sched.StartUpdateLolDataSched(a)
 	sched.StartCrawlLolMatchesSched(a)
 
 	fib := fiber.New()
@@ -36,6 +34,6 @@ func main() {
 	router.InitLolDataApiRoutes(fib, a)
 	router.InitLolApiRoutes(fib, a)
 
-	fmt.Println("Server start at: " + time.Now().String())
+	log.Println("Server started")
 	log.Fatal(fib.Listen(":" + cfg.Port))
 }

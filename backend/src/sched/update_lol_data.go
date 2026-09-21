@@ -3,7 +3,6 @@ package sched
 import (
 	"backend/src/app"
 	"context"
-	"fmt"
 	"log"
 	"time"
 )
@@ -17,13 +16,11 @@ func StartUpdateLolDataSched(a *app.Application) {
 // ---------- private ----------
 
 func startUpdateLolData(a *app.Application) {
-	ticker := time.NewTicker(time.Hour)
+	ticker := time.NewTicker(2 * time.Hour)
 	defer ticker.Stop()
 
-	fmt.Println("Schedule: updateLolData")
 	updateLolData(a)
 	for range ticker.C {
-		fmt.Println("Schedule: updateLolData")
 		updateLolData(a)
 	}
 }
@@ -33,34 +30,34 @@ func updateLolData(a *app.Application) {
 	go func() {
 		err := a.UpdateChampions(ctx)
 		if err != nil {
-			log.Println("UpdateChampions error:", err)
+			log.Println("Update champions data error:", err)
 		} else {
-			log.Println("UpdateChampions success")
+			log.Println("Update champions data success")
 		}
 
 	}()
 	go func() {
 		err := a.UpdateItems(ctx)
 		if err != nil {
-			log.Println("UpdateItems error:", err)
+			log.Println("Update items data error:", err)
 		} else {
-			log.Println("UpdateItems success")
+			log.Println("Update items data success")
 		}
 	}()
 	go func() {
 		err := a.UpdateSpells(ctx)
 		if err != nil {
-			log.Println("UpdateSpells error:", err)
+			log.Println("Update spells data error:", err)
 		} else {
-			log.Println("UpdateSpells success")
+			log.Println("Update spells data success")
 		}
 	}()
 	go func() {
 		err := a.UpdateRunes(ctx)
 		if err != nil {
-			log.Println("UpdateRunes error:", err)
+			log.Println("Update runes data error:", err)
 		} else {
-			log.Println("UpdateRunes success")
+			log.Println("Update runes data success")
 		}
 	}()
 }

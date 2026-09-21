@@ -133,6 +133,11 @@ type ParticipantDto struct {
 	Deaths  int `json:"deaths"`
 	Assists int `json:"assists"`
 
+	DoubleKills int `json:"doubleKills"`
+	TripleKills int `json:"tripleKills"`
+	QuadraKills int `json:"quadraKills"`
+	PentaKills  int `json:"pentaKills"`
+
 	GoldEarned                     int `json:"goldEarned"`
 	TotalMinionsKilled             int `json:"totalMinionsKilled"`
 	NeutralMinionsKilled           int `json:"neutralMinionsKilled"`
@@ -140,8 +145,14 @@ type ParticipantDto struct {
 	PhysicalDamageDealtToChampions int `json:"physicalDamageDealtToChampions"`
 	MagicDamageDealtToChampions    int `json:"magicDamageDealtToChampions"`
 	TrueDamageDealtToChampions     int `json:"trueDamageDealtToChampions"`
+	DamageDealtToTurrets           int `json:"damageDealtToTurrets"`
 	TotalDamageTaken               int `json:"totalDamageTaken"`
+	TotalHeal                      int `json:"totalHeal"`
+	TotalHealsOnTeammates          int `json:"totalHealsOnTeammates"`
+	TotalDamageShieldedOnTeammates int `json:"totalDamageShieldedOnTeammates"`
 	VisionScore                    int `json:"visionScore"`
+	WardsPlaced                    int `json:"wardsPlaced"`
+	WardsKilled                    int `json:"wardsKilled"`
 
 	GameEndedInEarlySurrender bool `json:"gameEndedInEarlySurrender"` // remake
 
