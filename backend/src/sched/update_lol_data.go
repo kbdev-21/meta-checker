@@ -9,8 +9,14 @@ import (
 )
 
 // Sync champions / items / spells / runes từ ddragon, chạy ngay 1 lần rồi lặp mỗi giờ.
-// Chặn vĩnh viễn, gọi bằng goroutine.
+// Trả về ngay, sched chạy nền.
 func StartUpdateLolDataSched(a *app.Application) {
+	go startUpdateLolData(a)
+}
+
+// ---------- private ----------
+
+func startUpdateLolData(a *app.Application) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 
@@ -21,8 +27,6 @@ func StartUpdateLolDataSched(a *app.Application) {
 		updateLolData(a)
 	}
 }
-
-// ---------- private ----------
 
 func updateLolData(a *app.Application) {
 	ctx := context.Background()

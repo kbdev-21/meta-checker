@@ -74,15 +74,12 @@ func ToPlayer(p db.LolPlayer) Player {
 // ---------- logic ----------
 
 // Không tìm thấy => IsNull = true.
-func (a *Application) GetPlayerById(ctx context.Context, id string) (shared.Nullable[Player], error) {
+func (a *Application) GetPlayerById(ctx context.Context, id string) (Player, error) {
 	row, err := a.q.GetPlayerById(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return shared.Nullable[Player]{IsNull: true}, nil
-	}
 	if err != nil {
-		return shared.Nullable[Player]{}, err
+		return Player{}, err
 	}
-	return shared.Nullable[Player]{Value: ToPlayer(row)}, nil
+	return ToPlayer(row), nil
 }
 
 // Đọc DB trước: player vừa update trong playerUpdateInterval thì trả luôn, không gọi Riot.
@@ -143,12 +140,34 @@ func (a *Application) UpdatePlayerByPlayerInfo(ctx context.Context, server Serve
 	if !server.IsValid() {
 		return Player{}, fmt.Errorf("invalid server: %q", server)
 	}
-	routing := server.riot()
 
-	account, err := a.riot.GetAccountByRiotId(ctx, routing.accountRegion, name, tag)
+	account, err := a.riot.GetAccountByRiotId(ctx, server.riot().accountRegion, name, tag)
 	if err != nil {
 		return Player{}, err
 	}
+	return a.updatePlayerFromAccount(ctx, server, account)
+}
+
+// Như UpdatePlayerByPlayerInfo nhưng vào thẳng bằng puuid: chỗ nào có sẵn puuid (crawler) thì
+// không phải đi vòng qua name/tag, đỡ 1 call account-v1.
+func (a *Application) UpdatePlayerByPuuid(ctx context.Context, server Server, puuid string) (Player, error) {
+	if !server.IsValid() {
+		return Player{}, fmt.Errorf("invalid server: %q", server)
+	}
+
+	account, err := a.riot.GetAccountByPuuid(ctx, server.riot().accountRegion, puuid)
+	if err != nil {
+		return Player{}, err
+	}
+	return a.updatePlayerFromAccount(ctx, server, account)
+}
+
+// ---------- private ----------
+
+// Lấy summoner (summoner-v4) và rank solo/flex (league-v4) của account rồi upsert vào DB.
+// Queue nào không có entry thì là UNRANKED.
+func (a *Application) updatePlayerFromAccount(ctx context.Context, server Server, account *external.AccountDto) (Player, error) {
+	routing := server.riot()
 	// summoner và league chỉ cần puuid, không phụ thuộc nhau => gọi song song.
 	var (
 		summoner    *external.SummonerDto
@@ -164,7 +183,7 @@ func (a *Application) UpdatePlayerByPlayerInfo(ctx context.Context, server Serve
 		entries, entriesErr = a.riot.GetLeagueEntriesByPuuid(ctx, routing.platform, account.Puuid)
 	})
 	wg.Wait()
-	err = errors.Join(summonerErr, entriesErr)
+	err := errors.Join(summonerErr, entriesErr)
 	if err != nil {
 		return Player{}, err
 	}
@@ -207,13 +226,8 @@ func (a *Application) UpdatePlayerByPlayerInfo(ctx context.Context, server Serve
 	if err != nil {
 		return Player{}, err
 	}
-	if player.IsNull {
-		return Player{}, fmt.Errorf("player %s not found after upsert", account.Puuid)
-	}
-	return player.Value, nil
+	return player, nil
 }
-
-// ---------- private ----------
 
 type queueRank struct {
 	rank   shared.Nullable[Rank]

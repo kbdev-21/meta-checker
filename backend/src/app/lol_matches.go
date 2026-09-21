@@ -193,26 +193,10 @@ func (a *Application) SaveMatchesToDb(ctx context.Context, matches []*external.M
 	return a.getMatchesByIds(ctx, ids)
 }
 
-// Lấy list match id của player từ Riot (start = offset, count = số match; 0 => Riot default 20, tối đa 100);
-// match đã có trong DB thì đọc DB,
-// còn lại gọi Riot (GetMatchesByIds, song song theo batch) rồi lưu tất cả 1 lần bằng SaveMatchesToDb.
-// mode: NULL = mọi mode; chỉ nhận SOLO | FLEX (lọc theo queue của Riot), mode khác => err.
-// Kết quả theo thứ tự Riot trả về (mới nhất trước).
+// Phân giải player (DB / Riot) rồi giao phần còn lại cho GetMatchesByPuuid.
+// mode: NULL = mọi mode; chỉ nhận SOLO | FLEX, mode khác => err.
 // Không tìm thấy player => IsNull = true, err = nil.
 func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server, name, tag string, mode shared.Nullable[GameMode], start, count int) (shared.Nullable[[]Match], error) {
-	if !server.IsValid() {
-		return shared.Nullable[[]Match]{}, fmt.Errorf("invalid server: %q", server)
-	}
-	routing := server.riot()
-	opts := external.MatchIdsOptions{Start: start, Count: count}
-	if !mode.IsNull {
-		queue, ok := riotQueueOf(mode.Value)
-		if !ok {
-			return shared.Nullable[[]Match]{}, fmt.Errorf("unsupported mode: %q", mode.Value)
-		}
-		opts.Queue = &queue
-	}
-
 	player, err := a.FindPlayerByPlayerInfo(ctx, server, name, tag)
 	if err != nil {
 		return shared.Nullable[[]Match]{}, err
@@ -221,14 +205,40 @@ func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server,
 		return shared.Nullable[[]Match]{IsNull: true}, nil
 	}
 
-	matchIds, err := a.riot.GetMatchIdsByPuuid(ctx, routing.matchRegion, player.Value.Id, opts)
+	matches, err := a.GetMatchesByPuuid(ctx, server, player.Value.Id, mode, start, count)
 	if err != nil {
 		return shared.Nullable[[]Match]{}, err
+	}
+	return shared.Nullable[[]Match]{Value: matches}, nil
+}
+
+// Lấy list match id của player từ Riot (start = offset, count = số match; 0 => Riot default 20, tối đa 100);
+// match đã có trong DB thì đọc DB,
+// còn lại gọi Riot (GetMatchesByIds, song song theo batch) rồi lưu tất cả 1 lần bằng SaveMatchesToDb.
+// mode: NULL = mọi mode; chỉ nhận SOLO | FLEX (lọc theo queue của Riot), mode khác => err.
+// Kết quả theo thứ tự Riot trả về (mới nhất trước).
+func (a *Application) GetMatchesByPuuid(ctx context.Context, server Server, puuid string, mode shared.Nullable[GameMode], start, count int) ([]Match, error) {
+	if !server.IsValid() {
+		return nil, fmt.Errorf("invalid server: %q", server)
+	}
+	routing := server.riot()
+	opts := external.MatchIdsOptions{Start: start, Count: count}
+	if !mode.IsNull {
+		queue, ok := riotQueueOf(mode.Value)
+		if !ok {
+			return nil, fmt.Errorf("unsupported mode: %q", mode.Value)
+		}
+		opts.Queue = &queue
+	}
+
+	matchIds, err := a.riot.GetMatchIdsByPuuid(ctx, routing.matchRegion, puuid, opts)
+	if err != nil {
+		return nil, err
 	}
 
 	existing, err := a.getMatchesByIds(ctx, matchIds)
 	if err != nil {
-		return shared.Nullable[[]Match]{}, err
+		return nil, err
 	}
 	byId := map[string]Match{}
 	for _, m := range existing {
@@ -244,13 +254,13 @@ func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server,
 	// Đợt 1: chỉ gọi Riot.
 	dtos, err := a.riot.GetMatchesByIdsInParallel(ctx, routing.matchRegion, missingIds)
 	if err != nil {
-		return shared.Nullable[[]Match]{}, err
+		return nil, err
 	}
 
 	// Đợt 2: lưu tất cả trong 1 lần.
 	saved, err := a.SaveMatchesToDb(ctx, dtos)
 	if err != nil {
-		return shared.Nullable[[]Match]{}, err
+		return nil, err
 	}
 	for _, m := range saved {
 		byId[m.Id] = m
@@ -262,7 +272,7 @@ func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server,
 			out = append(out, m)
 		}
 	}
-	return shared.Nullable[[]Match]{Value: out}, nil
+	return out, nil
 }
 
 // ---------- private ----------

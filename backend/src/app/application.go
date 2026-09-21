@@ -14,6 +14,7 @@ type Application struct {
 	cfg     config.Config
 	p       *pgxpool.Pool // dùng khi cần transaction: q.WithTx(tx)
 	q       *db.Queries
+
 	riot    *external.RiotClient
 	ddragon *external.DDragonClient
 }
