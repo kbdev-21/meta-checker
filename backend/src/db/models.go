@@ -29,6 +29,7 @@ type LolChampionStat struct {
 	MetaID             pgtype.UUID `json:"metaId"`
 	Position           string      `json:"position"`
 	ChampionID         int32       `json:"championId"`
+	ChampionSlug       string      `json:"championSlug"`
 	Games              int32       `json:"games"`
 	Wins               int32       `json:"wins"`
 	WinRate            float64     `json:"winRate"`

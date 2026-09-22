@@ -176,16 +176,6 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
 CREATE INDEX IF NOT EXISTS lol_match_participants_player_idx   ON lol_match_participants (player_id);
 CREATE INDEX IF NOT EXISTS lol_match_participants_champion_idx ON lol_match_participants (champion_id, position);
 
-
-
-
-
-
-
-
-
-
-
 -- ============================================================
 -- ANALYTICS — bảng tổng hợp, chỉ job ghi. Xóa sạch rồi chạy lại
 -- job phải ra đúng kết quả cũ (idempotent, không có watermark).
@@ -205,7 +195,8 @@ CREATE TABLE IF NOT EXISTS lol_metas (
 CREATE TABLE IF NOT EXISTS lol_champion_stats (
     meta_id     UUID    NOT NULL REFERENCES lol_metas (id) ON DELETE CASCADE,
     position    TEXT    NOT NULL,         -- TOP | JGL | MID | ADC | SPT
-    champion_id INTEGER NOT NULL,         -- không FK tới lol_champions: tướng mới có thể vào match trước khi ddragon sync; tên/ảnh join lúc đọc
+    champion_id   INTEGER NOT NULL,       -- không FK tới lol_champions: tướng mới có thể vào match trước khi ddragon sync
+    champion_slug TEXT    NOT NULL,       -- snapshot = lol_match_participants.champion_slug (ddragon "id"); dùng cho URL ảnh, khỏi join lol_champions
 
     -- Số đếm, không phải tỉ lệ: cần để gộp nhiều dòng lại và để tính Wilson score.
     -- power (điểm xếp hạng) & tier (S/A/B...) KHÔNG lưu ở đây: đều suy ra được từ các cột
