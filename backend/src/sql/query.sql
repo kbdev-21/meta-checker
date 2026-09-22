@@ -244,11 +244,10 @@ WITH mp AS (
       AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
       AND p.position <> 'UNK'
 ),
-ranked AS (
+agg AS (
     SELECT position, champion_id, spell1_id, spell2_id,
            count(*) AS games,
-           count(*) FILTER (WHERE is_win) AS wins,
-           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+           count(*) FILTER (WHERE is_win) AS wins
     FROM mp
     GROUP BY position, champion_id, spell1_id, spell2_id
 )
@@ -259,8 +258,7 @@ FROM (
            jsonb_agg(jsonb_build_object(
                'spell1Id', spell1_id, 'spell2Id', spell2_id, 'games', games, 'wins', wins
            ) ORDER BY games DESC) AS arr
-    FROM ranked
-    WHERE rn <= sqlc.arg(top_n)::int
+    FROM agg
     GROUP BY position, champion_id
 ) sub
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
@@ -281,11 +279,10 @@ WITH mp AS (
       AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
       AND p.position <> 'UNK'
 ),
-ranked AS (
+agg AS (
     SELECT position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
            count(*) AS games,
-           count(*) FILTER (WHERE is_win) AS wins,
-           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+           count(*) FILTER (WHERE is_win) AS wins
     FROM mp
     GROUP BY position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes
 )
@@ -298,8 +295,7 @@ FROM (
                'keyRune', key_rune, 'runes', to_jsonb(runes), 'statRunes', to_jsonb(stat_runes),
                'games', games, 'wins', wins
            ) ORDER BY games DESC) AS arr
-    FROM ranked
-    WHERE rn <= sqlc.arg(top_n)::int
+    FROM agg
     GROUP BY position, champion_id
 ) sub
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
@@ -322,11 +318,10 @@ WITH item_rows AS (
       AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
       AND p.position <> 'UNK'
 ),
-ranked AS (
+agg AS (
     SELECT position, champion_id, item_id,
            count(*) AS games,
-           count(*) FILTER (WHERE is_win) AS wins,
-           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+           count(*) FILTER (WHERE is_win) AS wins
     FROM item_rows
     GROUP BY position, champion_id, item_id
 )
@@ -337,8 +332,7 @@ FROM (
            jsonb_agg(jsonb_build_object(
                'itemId', item_id, 'games', games, 'wins', wins
            ) ORDER BY games DESC) AS arr
-    FROM ranked
-    WHERE rn <= sqlc.arg(top_n)::int
+    FROM agg
     GROUP BY position, champion_id
 ) sub
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
@@ -360,11 +354,10 @@ WITH item_rows AS (
       AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
       AND p.position <> 'UNK'
 ),
-ranked AS (
+agg AS (
     SELECT position, champion_id, item_id,
            count(*) AS games,
-           count(*) FILTER (WHERE is_win) AS wins,
-           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+           count(*) FILTER (WHERE is_win) AS wins
     FROM item_rows
     GROUP BY position, champion_id, item_id
 )
@@ -375,8 +368,7 @@ FROM (
            jsonb_agg(jsonb_build_object(
                'itemId', item_id, 'games', games, 'wins', wins
            ) ORDER BY games DESC) AS arr
-    FROM ranked
-    WHERE rn <= sqlc.arg(top_n)::int
+    FROM agg
     GROUP BY position, champion_id
 ) sub
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
@@ -402,11 +394,10 @@ pairs AS (
     FROM mp me
     JOIN mp opp ON opp.match_id = me.match_id AND opp.position = me.position AND opp.team <> me.team
 ),
-ranked AS (
+agg AS (
     SELECT position, champion_id, opponent_champion_id,
            count(*) AS games,
-           count(*) FILTER (WHERE is_win) AS wins,
-           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+           count(*) FILTER (WHERE is_win) AS wins
     FROM pairs
     GROUP BY position, champion_id, opponent_champion_id
 )
@@ -417,8 +408,7 @@ FROM (
            jsonb_agg(jsonb_build_object(
                'opponentChampionId', opponent_champion_id, 'games', games, 'wins', wins
            ) ORDER BY games DESC) AS arr
-    FROM ranked
-    WHERE rn <= sqlc.arg(top_n)::int
+    FROM agg
     GROUP BY position, champion_id
 ) sub
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
@@ -443,12 +433,28 @@ FROM (
 WHERE ban.champion_id >= 0
 GROUP BY ban.champion_id;
 
--- Đọc champion stats của 1 meta kèm ban (ban theo champion, join mọi position của tướng đó).
--- champion_id = 0 => lấy mọi tướng; khác 0 => chỉ tướng đó (mọi position của nó).
+-- Tier list: cột scalar + matchups, KHÔNG lấy 4 cột JSONB build còn lại (chúng chiếm
+-- ~85% payload của cả meta mà tier list không dùng tới); muốn build thì gọi
+-- GetChampionStatsByMetaAndChampId cho từng tướng.
 -- name: GetChampionStatsByMeta :many
+SELECT cs.meta_id, cs.position, cs.champion_id, cs.champion_slug,
+       cs.games, cs.wins, cs.win_rate, cs.pick_rate,
+       cs.avg_kills, cs.avg_deaths, cs.avg_assists, cs.avg_kda, cs.avg_kp,
+       cs.avg_cs_per_min, cs.avg_gold_per_min, cs.avg_dmg_per_min,
+       cs.avg_physical_dmg, cs.avg_magic_dmg, cs.avg_true_dmg,
+       cs.avg_penta, cs.avg_solo_kills, cs.avg_perf_score,
+       cs.matchups,
+       COALESCE(b.bans, 0)::int AS bans, COALESCE(b.ban_rate, 0)::float8 AS ban_rate
+FROM lol_champion_stats cs
+LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC;
+
+-- Như trên nhưng chỉ 1 tướng (mọi position của nó), và có kèm build.
+-- name: GetChampionStatsByMetaAndChampId :many
 SELECT cs.*, COALESCE(b.bans, 0)::int AS bans, COALESCE(b.ban_rate, 0)::float8 AS ban_rate
 FROM lol_champion_stats cs
 LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
-  AND (sqlc.arg(champion_id)::int = 0 OR cs.champion_id = sqlc.arg(champion_id)::int)
+  AND cs.champion_id = sqlc.arg(champion_id)::int
 ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC;

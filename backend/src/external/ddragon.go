@@ -6,14 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
 const ddragonBase = "https://ddragon.leagueoflegends.com"
 
+// Patch cỡ 2 tuần mới đổi nên TTL 1h là thừa tươi; trùng nhịp sched chạy mỗi giờ.
+const ddragonVersionTTL = time.Hour
+
 // lang: en_US | vi_VN | ko_KR | ...
 type DDragonClient struct {
 	http *http.Client
+
+	// Cache version: mọi request đọc analytics đều cần, không lẽ gọi ddragon mỗi lần.
+	versionMu      sync.Mutex
+	version        string
+	versionExpires time.Time
 }
 
 func NewDDragonClient() *DDragonClient {
@@ -52,16 +61,32 @@ func DDRuneIconUrl(icon string) string {
 	return ddragonBase + "/cdn/img/" + icon
 }
 
+// Cache 1h. Giữ lock qua cả cú fetch: nhiều request cùng hết hạn một lúc thì chỉ 1 cái
+// đi gọi ddragon, số còn lại chờ rồi ăn cache mới.
 func (c *DDragonClient) GetCurrentVersion(ctx context.Context) (string, error) {
+	c.versionMu.Lock()
+	defer c.versionMu.Unlock()
+
+	if c.version != "" && time.Now().Before(c.versionExpires) {
+		return c.version, nil
+	}
+
 	var versions []string
 	err := c.get(ctx, "/api/versions.json", &versions)
+	if err == nil && len(versions) == 0 {
+		err = errors.New("ddragon: empty versions")
+	}
 	if err != nil {
+		// Còn bản cũ thì xài tạm: version cũ vẫn dùng được, hỏng cả request thì không.
+		if c.version != "" {
+			return c.version, nil
+		}
 		return "", err
 	}
-	if len(versions) == 0 {
-		return "", errors.New("ddragon: empty versions")
-	}
-	return versions[0], nil
+
+	c.version = versions[0]
+	c.versionExpires = time.Now().Add(ddragonVersionTTL)
+	return c.version, nil
 }
 
 // key = champion id dạng tên (vd "Aatrox"); DDChampion.Key = championId số trong match.

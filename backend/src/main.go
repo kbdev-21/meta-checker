@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 )
@@ -28,6 +29,7 @@ func main() {
 
 	fib.Use(cors.New())
 	fib.Use(logger.New())
+	fib.Use(compress.New())
 
 	router.InitLolDataApiRoutes(fib, a)
 	router.InitLolApiRoutes(fib, a)
