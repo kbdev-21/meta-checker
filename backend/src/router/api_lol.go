@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"log"
 	"net/url"
 	"strconv"
@@ -29,8 +28,8 @@ func InitLolApiRoutes(fib *fiber.App, a *app.Application) {
 
 	fib.Get("/api/lol/matches/by-player-info/:server/:name/:tag", getMatchesByPlayerInfoApiHandler(a))
 
-	fib.Post("/api/lol/analytics/start-update", startAnalyticsUpdateApiHandler(a))
 	fib.Get("/api/lol/analytics", getAnalyticsApiHandler(a))
+	fib.Get("/api/lol/analytics/champions/:id", getChampionAnalyticsApiHandler(a))
 }
 
 // GET /api/lol/players?q=...
@@ -112,22 +111,6 @@ func getMatchesByPlayerInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) er
 	}
 }
 
-// POST /api/lol/analytics/start-update
-// Chạy update nền rồi trả luôn (dùng để test, chưa có sched).
-func startAnalyticsUpdateApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
-	return func(ctx fiber.Ctx) error {
-		go func() {
-			err := a.UpdateAnalytics(context.Background())
-			if err != nil {
-				log.Printf("update analytics: %v", err)
-			} else {
-				log.Println("update analytics success")
-			}
-		}()
-		return ctx.JSON(fiber.Map{"message": "Started!"})
-	}
-}
-
 // GET /api/lol/analytics?server=GLOBAL&rankBucket=MASTER_PLUS
 // Chưa tổng hợp cho patch hiện tại => 404.
 func getAnalyticsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
@@ -149,15 +132,40 @@ func getAnalyticsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
 	}
 }
 
+// GET /api/lol/analytics/champions/:id?server=GLOBAL&rankBucket=MASTER_PLUS
+// Trả list ChampionStat mọi position của champion. Meta chưa tổng hợp => 404.
+func getChampionAnalyticsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
+		server, bucket, err := analyticsParams(ctx)
+		if err != nil {
+			return err
+		}
+		id, err := strconv.Atoi(ctx.Params("id"))
+		if err != nil || id <= 0 {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid id")
+		}
+
+		stats, err := a.GetChampionStats(ctx.Context(), server, bucket, int32(id))
+		if err != nil {
+			log.Printf("get champion analytics %s/%s/%d: %v", server, bucket, id, err)
+			return err
+		}
+		if stats.IsNull {
+			return ctx.SendStatus(fiber.StatusNotFound)
+		}
+		return ctx.JSON(stats.Value)
+	}
+}
+
 // ---------- private ----------
 
-// Đọc ?server&rankBucket. Input sai => *fiber.Error 400.
+// Đọc ?server&rankBucket. Không truyền => mặc định GLOBAL / MASTER_PLUS. Input sai => *fiber.Error 400.
 func analyticsParams(ctx fiber.Ctx) (server string, bucket app.RankBucket, err error) {
-	server = strings.ToUpper(ctx.Query("server"))
+	server = strings.ToUpper(ctx.Query("server", app.MetaServerGlobal))
 	if !app.IsValidMetaServer(server) {
 		return "", "", fiber.NewError(fiber.StatusBadRequest, "invalid server")
 	}
-	bucket = app.RankBucket(strings.ToUpper(ctx.Query("rankBucket")))
+	bucket = app.RankBucket(strings.ToUpper(ctx.Query("rankBucket", string(app.RankBucketMasterPlus))))
 	if !bucket.IsValid() {
 		return "", "", fiber.NewError(fiber.StatusBadRequest, "invalid rankBucket")
 	}

@@ -444,9 +444,11 @@ WHERE ban.champion_id >= 0
 GROUP BY ban.champion_id;
 
 -- Đọc champion stats của 1 meta kèm ban (ban theo champion, join mọi position của tướng đó).
+-- champion_id = 0 => lấy mọi tướng; khác 0 => chỉ tướng đó (mọi position của nó).
 -- name: GetChampionStatsByMeta :many
 SELECT cs.*, COALESCE(b.bans, 0)::int AS bans, COALESCE(b.ban_rate, 0)::float8 AS ban_rate
 FROM lol_champion_stats cs
 LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
 WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND (sqlc.arg(champion_id)::int = 0 OR cs.champion_id = sqlc.arg(champion_id)::int)
 ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC;

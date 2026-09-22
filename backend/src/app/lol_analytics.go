@@ -226,7 +226,7 @@ func (a *Application) GetAnalytics(ctx context.Context, server string, bucket Ra
 		return shared.Nullable[Meta]{}, err
 	}
 
-	rows, err := a.q.GetChampionStatsByMeta(ctx, m.ID)
+	rows, err := a.q.GetChampionStatsByMeta(ctx, db.GetChampionStatsByMetaParams{MetaID: m.ID, ChampionID: 0})
 	if err != nil {
 		return shared.Nullable[Meta]{}, err
 	}
@@ -235,6 +235,34 @@ func (a *Application) GetAnalytics(ctx context.Context, server string, bucket Ra
 		stats = append(stats, ToChampionStat(m, r))
 	}
 	return shared.Nullable[Meta]{Value: ToMeta(m, stats)}, nil
+}
+
+// Trả mọi position của 1 champion trong lát cắt của patch hiện tại.
+// Chưa tổng hợp meta => IsNull; champion không có dòng nào => list rỗng.
+func (a *Application) GetChampionStats(ctx context.Context, server string, bucket RankBucket, championId int32) (shared.Nullable[[]ChampionStat], error) {
+	version, err := a.ddragon.GetCurrentVersion(ctx)
+	if err != nil {
+		return shared.Nullable[[]ChampionStat]{}, err
+	}
+	patch := shared.PatchOf(version)
+
+	m, err := a.q.GetMeta(ctx, db.GetMetaParams{Patch: patch, Server: server, RankBucket: string(bucket)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return shared.Nullable[[]ChampionStat]{IsNull: true}, nil
+	}
+	if err != nil {
+		return shared.Nullable[[]ChampionStat]{}, err
+	}
+
+	rows, err := a.q.GetChampionStatsByMeta(ctx, db.GetChampionStatsByMetaParams{MetaID: m.ID, ChampionID: championId})
+	if err != nil {
+		return shared.Nullable[[]ChampionStat]{}, err
+	}
+	stats := make([]ChampionStat, 0, len(rows))
+	for _, r := range rows {
+		stats = append(stats, ToChampionStat(m, r))
+	}
+	return shared.Nullable[[]ChampionStat]{Value: stats}, nil
 }
 
 // ---------- private ----------

@@ -69,8 +69,14 @@ SELECT cs.meta_id, cs.position, cs.champion_id, cs.champion_slug, cs.games, cs.w
 FROM lol_champion_stats cs
 LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
 WHERE cs.meta_id = $1::uuid
+  AND ($2::int = 0 OR cs.champion_id = $2::int)
 ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC
 `
+
+type GetChampionStatsByMetaParams struct {
+	MetaID     pgtype.UUID `json:"metaId"`
+	ChampionID int32       `json:"championId"`
+}
 
 type GetChampionStatsByMetaRow struct {
 	MetaID             pgtype.UUID `json:"metaId"`
@@ -105,8 +111,9 @@ type GetChampionStatsByMetaRow struct {
 }
 
 // Đọc champion stats của 1 meta kèm ban (ban theo champion, join mọi position của tướng đó).
-func (q *Queries) GetChampionStatsByMeta(ctx context.Context, metaID pgtype.UUID) ([]GetChampionStatsByMetaRow, error) {
-	rows, err := q.db.Query(ctx, getChampionStatsByMeta, metaID)
+// champion_id = 0 => lấy mọi tướng; khác 0 => chỉ tướng đó (mọi position của nó).
+func (q *Queries) GetChampionStatsByMeta(ctx context.Context, arg GetChampionStatsByMetaParams) ([]GetChampionStatsByMetaRow, error) {
+	rows, err := q.db.Query(ctx, getChampionStatsByMeta, arg.MetaID, arg.ChampionID)
 	if err != nil {
 		return nil, err
 	}
