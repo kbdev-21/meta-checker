@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS lol_matches (
     game_start_at   TIMESTAMPTZ NOT NULL,
     duration_sec    INTEGER     NOT NULL,
     is_remake       BOOLEAN     NOT NULL,              -- gameEndedInEarlySurrender
-    estimated_rank  TEXT,                              -- CHALLENGER | GRANDMASTER | MASTER | DIAMOND ...; NULL = unknown
+    estimated_rank  TEXT        NOT NULL,              -- CHALLENGER | GRANDMASTER | MASTER | DIAMOND ...; UNRANKED = không participant nào có rank đã biết
 
     banned_champion_ids  INTEGER[] NOT NULL,           -- chỉ các tướng bị ban, bỏ lượt không ban (-1)
 

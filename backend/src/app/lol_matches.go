@@ -23,7 +23,7 @@ type Match struct {
 	GameStartAt       time.Time             `json:"gameStartAt"`
 	DurationSec       int32                 `json:"durationSec"`
 	IsRemake          bool                  `json:"isRemake"`
-	EstimatedRank     shared.Nullable[Rank] `json:"estimatedRank"`
+	EstimatedRank     Rank                  `json:"estimatedRank"`
 	BannedChampionIds []int32               `json:"bannedChampionIds"`
 	WinningTeam       int16                 `json:"winningTeam"`
 	Team1Kills        int16                 `json:"team1Kills"`
@@ -47,7 +47,7 @@ func ToMatch(m db.LolMatch, participants []MatchParticipant) Match {
 		GameStartAt:       m.GameStartAt.Time,
 		DurationSec:       m.DurationSec,
 		IsRemake:          m.IsRemake,
-		EstimatedRank:     shared.NullableText[Rank](m.EstimatedRank),
+		EstimatedRank:     Rank(m.EstimatedRank),
 		BannedChampionIds: m.BannedChampionIds,
 		WinningTeam:       m.WinningTeam,
 		Team1Kills:        m.Team1Kills,
@@ -397,7 +397,7 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 		}
 		participantParams = append(participantParams, participantParamsOf(matchParams.ID, p, rankPower, teamKills[p.TeamId], matchParams.DurationSec, laneOpponentGoldOf(p, info.Participants)))
 	}
-	matchParams.EstimatedRank = shared.PgText(estimatedRankOf(knownRankPowers))
+	matchParams.EstimatedRank = string(estimatedRankOf(knownRankPowers))
 	return matchParams, participantParams
 }
 

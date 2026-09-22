@@ -205,7 +205,7 @@ type InsertMatchesParams struct {
 	GameStartAt       pgtype.Timestamptz `json:"gameStartAt"`
 	DurationSec       int32              `json:"durationSec"`
 	IsRemake          bool               `json:"isRemake"`
-	EstimatedRank     pgtype.Text        `json:"estimatedRank"`
+	EstimatedRank     string             `json:"estimatedRank"`
 	BannedChampionIds []int32            `json:"bannedChampionIds"`
 	WinningTeam       int16              `json:"winningTeam"`
 	Team1Kills        int16              `json:"team1Kills"`

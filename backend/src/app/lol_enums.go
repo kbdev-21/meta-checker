@@ -170,10 +170,12 @@ func normalizeTier(rank shared.Nullable[Rank], tier shared.Nullable[Tier]) share
 }
 
 // Trung bình rank power (đã bỏ unknown / UNRANKED) => rank ứng với bậc đó.
-// Không có ai => NULL. Master trở lên LP không giới hạn nên bậc vượt Challenger thì lấy Challenger.
-func estimatedRankOf(rankPowers []int32) shared.Nullable[Rank] {
+// Không participant nào có rank đã biết => UNRANKED (không phải NULL): cột estimated_rank
+// là NOT NULL, và analytics lọc theo rank nên UNRANKED bị loại y như unknown.
+// Master trở lên LP không giới hạn nên bậc vượt Challenger thì lấy Challenger.
+func estimatedRankOf(rankPowers []int32) Rank {
 	if len(rankPowers) == 0 {
-		return shared.Nullable[Rank]{IsNull: true}
+		return RankUnranked
 	}
 	var sum int64
 	for _, p := range rankPowers {
@@ -183,10 +185,10 @@ func estimatedRankOf(rankPowers []int32) shared.Nullable[Rank] {
 	level = max(rankLevels[RankIron], min(level, rankLevels[RankChallenger]))
 	for rank, l := range rankLevels {
 		if l == level {
-			return shared.Nullable[Rank]{Value: rank}
+			return rank
 		}
 	}
-	return shared.Nullable[Rank]{IsNull: true}
+	return RankUnranked
 }
 
 // ---------- game mode ----------
