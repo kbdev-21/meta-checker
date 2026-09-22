@@ -4,6 +4,7 @@ import (
 	"backend/src/app"
 	"backend/src/config"
 	"backend/src/router"
+	"backend/src/sched"
 	"context"
 	"log"
 
@@ -20,8 +21,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//sched.StartUpdateLolDataSched(a)
-	//sched.StartCrawlLolMatchesSched(a)
+	sched.StartUpdateLolDataSched(a)
+	sched.StartCrawlLolMatchesSched(a)
 
 	fib := fiber.New()
 

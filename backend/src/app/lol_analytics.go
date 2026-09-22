@@ -173,9 +173,16 @@ func ToMeta(m db.LolMeta, stats []ChampionStat) Meta {
 
 // ---------- logic ----------
 
-// Slice test hiện tại. Mở rộng thêm server / bucket ở đây khi cần.
+// GLOBAL + mọi server đang crawl (suy từ Crawlers để khỏi khai báo trùng).
+// Thêm bucket ở đây khi cần.
 var (
-	analyticsServers = []string{MetaServerGlobal}
+	analyticsServers = func() []string {
+		out := []string{MetaServerGlobal}
+		for _, c := range Crawlers {
+			out = append(out, string(c.Server))
+		}
+		return out
+	}()
 	analyticsBuckets = []RankBucket{RankBucketMasterPlus}
 )
 
