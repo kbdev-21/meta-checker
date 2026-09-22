@@ -27,6 +27,17 @@ func (b RankBucket) IsValid() bool {
 	return b == RankBucketMasterPlus
 }
 
+// Bậc sức mạnh của tướng trong meta, suy từ TierScore (thang 100 chia đều 5 bậc).
+type ChampionTier string
+
+const (
+	ChampionTierS ChampionTier = "S"
+	ChampionTierA ChampionTier = "A"
+	ChampionTierB ChampionTier = "B"
+	ChampionTierC ChampionTier = "C"
+	ChampionTierD ChampionTier = "D"
+)
+
 // server đặc biệt của meta: gộp mọi server.
 const MetaServerGlobal = "GLOBAL"
 
@@ -79,13 +90,14 @@ type ChampionStatSummary struct {
 	ChampionId   int32    `json:"championId"`
 	ChampionSlug string   `json:"championSlug"`
 
-	Games    int32   `json:"games"`
-	Wins     int32   `json:"wins"`
-	WinRate  float64 `json:"winRate"`
-	PickRate float64 `json:"pickRate"`
-	Bans     int32   `json:"bans"`
-	BanRate  float64 `json:"banRate"`
-	Power    int32   `json:"power"` // tính lúc đọc từ winRate + pickRate, không lưu DB
+	Games     int32        `json:"games"`
+	Wins      int32        `json:"wins"`
+	WinRate   float64      `json:"winRate"`
+	PickRate  float64      `json:"pickRate"`
+	Bans      int32        `json:"bans"`
+	BanRate   float64      `json:"banRate"`
+	TierScore int32        `json:"tierScore"` // tierScore + tier tính lúc đọc từ winRate + pickRate, không lưu DB
+	Tier      ChampionTier `json:"tier"`
 
 	AvgKills       float64 `json:"avgKills"`
 	AvgDeaths      float64 `json:"avgDeaths"`
@@ -127,6 +139,8 @@ type Meta struct {
 }
 
 func ToChampionStatSummary(m db.LolMeta, r db.GetChampionStatsByMetaRow) ChampionStatSummary {
+	tierScore := tierScoreOf(r.WinRate, r.PickRate)
+
 	return ChampionStatSummary{
 		Patch:      m.Patch,
 		Server:     m.Server,
@@ -136,13 +150,14 @@ func ToChampionStatSummary(m db.LolMeta, r db.GetChampionStatsByMetaRow) Champio
 		ChampionId:   r.ChampionID,
 		ChampionSlug: r.ChampionSlug,
 
-		Games:    r.Games,
-		Wins:     r.Wins,
-		WinRate:  r.WinRate,
-		PickRate: r.PickRate,
-		Bans:     r.Bans,
-		BanRate:  r.BanRate,
-		Power:    champPowerOf(r.WinRate, r.PickRate),
+		Games:     r.Games,
+		Wins:      r.Wins,
+		WinRate:   r.WinRate,
+		PickRate:  r.PickRate,
+		Bans:      r.Bans,
+		BanRate:   r.BanRate,
+		TierScore: tierScore,
+		Tier:      championTierOf(tierScore),
 
 		AvgKills:       r.AvgKills,
 		AvgDeaths:      r.AvgDeaths,
@@ -166,6 +181,8 @@ func ToChampionStatSummary(m db.LolMeta, r db.GetChampionStatsByMetaRow) Champio
 // Row của query 1 tướng là type khác (có thêm 4 cột build) nên sqlc không dùng chung
 // struct được; phần scalar vì vậy map lại ở đây, phải sửa kèm ToChampionStatSummary.
 func ToChampionStat(m db.LolMeta, r db.GetChampionStatsByMetaAndChampIdRow) ChampionStat {
+	tierScore := tierScoreOf(r.WinRate, r.PickRate)
+
 	return ChampionStat{
 		ChampionStatSummary: ChampionStatSummary{
 			Patch:      m.Patch,
@@ -176,13 +193,14 @@ func ToChampionStat(m db.LolMeta, r db.GetChampionStatsByMetaAndChampIdRow) Cham
 			ChampionId:   r.ChampionID,
 			ChampionSlug: r.ChampionSlug,
 
-			Games:    r.Games,
-			Wins:     r.Wins,
-			WinRate:  r.WinRate,
-			PickRate: r.PickRate,
-			Bans:     r.Bans,
-			BanRate:  r.BanRate,
-			Power:    champPowerOf(r.WinRate, r.PickRate),
+			Games:     r.Games,
+			Wins:      r.Wins,
+			WinRate:   r.WinRate,
+			PickRate:  r.PickRate,
+			Bans:      r.Bans,
+			BanRate:   r.BanRate,
+			TierScore: tierScore,
+			Tier:      championTierOf(tierScore),
 
 			AvgKills:       r.AvgKills,
 			AvgDeaths:      r.AvgDeaths,
@@ -415,8 +433,8 @@ func bucketRanks(b RankBucket) []string {
 	return nil
 }
 
-// power = winScoreRatio*60 + pickScoreRatio*40, mỗi ratio clamp về [0,1]. Cắt về int như bản Kotlin.
-func champPowerOf(winRate, pickRate float64) int32 {
+// tierScore = winScoreRatio*60 + pickScoreRatio*40, mỗi ratio clamp về [0,1]. Cắt về int như bản Kotlin.
+func tierScoreOf(winRate, pickRate float64) int32 {
 	const winWeight, pickWeight = 60.0, 40.0
 	const minWinRate, maxWinRate = 0.46, 0.54
 	const minPickRate, maxPickRate = 0.0, 0.075
@@ -428,6 +446,21 @@ func champPowerOf(winRate, pickRate float64) int32 {
 
 func clamp01(x float64) float64 {
 	return max(0.0, min(1.0, x))
+}
+
+// Thang 100 chia đều 5 bậc: S 80-100, A 60-79, B 40-59, C 20-39, D 0-19.
+func championTierOf(tierScore int32) ChampionTier {
+	switch {
+	case tierScore >= 80:
+		return ChampionTierS
+	case tierScore >= 60:
+		return ChampionTierA
+	case tierScore >= 40:
+		return ChampionTierB
+	case tierScore >= 20:
+		return ChampionTierC
+	}
+	return ChampionTierD
 }
 
 // JSONB build luôn là mảng hợp lệ (cột DEFAULT '[]'); lỗi bất thường => mảng rỗng.
