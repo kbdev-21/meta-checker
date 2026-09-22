@@ -232,11 +232,12 @@ CREATE TABLE IF NOT EXISTS lol_champion_stats (
     avg_perf_score       DOUBLE PRECISION NOT NULL,
 
     -- Build tốt nhất, mỗi phần tử LƯU CẢ COUNT (games/wins) để recompute rate & pure-SQL được.
-    -- best_spell_combos:    [{"s1":Int,"s2":Int,"games":Int,"wins":Int}]  -- spell đã sort s1<s2
-    -- best_runes:           [{"main_style":Int,"sub_style":Int,"key_rune":Int,"runes":[Int],"stat_runes":[Int],"games":Int,"wins":Int}]
-    -- best_legendary_items: [{"item_id":Int,"games":Int,"wins":Int}]      -- lol_items.type = LEGENDARY
-    -- best_boot_items:      [{"item_id":Int,"games":Int,"wins":Int}]      -- lol_items.type = BOOTS
-    -- matchups:             [{"opponent_champion_id":Int,"games":Int,"wins":Int}]  -- đối đầu cùng lane, khác phe
+    -- Key JSON theo camelCase khớp json tag của participant trong bản Go.
+    -- best_spell_combos:    [{"spell1Id":Int,"spell2Id":Int,"games":Int,"wins":Int}]  -- spell đã sort spell1Id < spell2Id
+    -- best_runes:           [{"runePrimaryStyle":Int,"runeSubStyle":Int,"keyRune":Int,"runes":[Int],"statRunes":[Int],"games":Int,"wins":Int}]
+    -- best_legendary_items: [{"itemId":Int,"games":Int,"wins":Int}]  -- lol_items.type = LEGENDARY
+    -- best_boot_items:      [{"itemId":Int,"games":Int,"wins":Int}]  -- lol_items.type = BOOTS
+    -- matchups:             [{"opponentChampionId":Int,"games":Int,"wins":Int}]  -- đối đầu cùng lane, khác phe
     best_spell_combos    JSONB NOT NULL DEFAULT '[]',
     best_runes           JSONB NOT NULL DEFAULT '[]',
     best_legendary_items JSONB NOT NULL DEFAULT '[]',
