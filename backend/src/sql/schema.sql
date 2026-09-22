@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     triple_kills           SMALLINT  NOT NULL,
     quadra_kills           SMALLINT  NOT NULL,
     penta_kills            SMALLINT  NOT NULL,
+    solo_kills             SMALLINT  NOT NULL,         -- challenges.soloKills: hạ gục không có đồng đội tham gia
 
     gold                   INTEGER   NOT NULL,
     gold_per_min           REAL      NOT NULL,         -- gold / phút, tính trong app
@@ -174,3 +175,88 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
 
 CREATE INDEX IF NOT EXISTS lol_match_participants_player_idx   ON lol_match_participants (player_id);
 CREATE INDEX IF NOT EXISTS lol_match_participants_champion_idx ON lol_match_participants (champion_id, position);
+
+
+
+
+
+
+
+
+
+
+
+-- ============================================================
+-- ANALYTICS — bảng tổng hợp, chỉ job ghi. Xóa sạch rồi chạy lại
+-- job phải ra đúng kết quả cũ (idempotent, không có watermark).
+-- ============================================================
+
+-- Một "meta" = một lát cắt tổng hợp theo (patch, server, rank_bucket).
+CREATE TABLE IF NOT EXISTS lol_metas (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(), -- job khỏi tự sinh; upsert theo UNIQUE bên dưới nên id giữ nguyên qua mỗi lần refresh
+    patch         TEXT        NOT NULL,
+    server        TEXT        NOT NULL,   -- GLOBAL + các server enum trong app: GLOBAL | VN | KR ...
+    rank_bucket   TEXT        NOT NULL,   -- MASTER_PLUS = estimated_rank thuộc MASTER | GRANDMASTER | CHALLENGER; có thể tách riêng 3 bậc khi đủ mẫu
+    total_matches INTEGER     NOT NULL,   -- đã lọc remake / trận ngắn / non-ranked; MẪU SỐ chung cho pick_rate & ban_rate
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (patch, server, rank_bucket)   -- job upsert theo khóa này
+);
+
+CREATE TABLE IF NOT EXISTS lol_champion_stats (
+    meta_id     UUID    NOT NULL REFERENCES lol_metas (id) ON DELETE CASCADE,
+    position    TEXT    NOT NULL,         -- TOP | JGL | MID | ADC | SPT
+    champion_id INTEGER NOT NULL,         -- không FK tới lol_champions: tướng mới có thể vào match trước khi ddragon sync; tên/ảnh join lúc đọc
+
+    -- Số đếm, không phải tỉ lệ: cần để gộp nhiều dòng lại và để tính Wilson score.
+    -- power (điểm xếp hạng) & tier (S/A/B...) KHÔNG lưu ở đây: đều suy ra được từ các cột
+    -- dưới đây trên chính 1 dòng, tính lúc đọc để đổi công thức/ngưỡng khỏi chạy lại job.
+    games     INTEGER NOT NULL,
+    wins      INTEGER NOT NULL,
+    win_rate  DOUBLE PRECISION NOT NULL,          -- wins / games; lưu sẵn để sort/lọc, đọc khỏi tính
+    pick_rate DOUBLE PRECISION NOT NULL,          -- games / meta.total_matches
+
+    -- Trung bình có trọng số. Gộp dòng: SUM(avg_x * games) / SUM(games). KHÔNG PHẢI AVG(avg_x).
+    avg_kills            DOUBLE PRECISION NOT NULL,
+    avg_deaths           DOUBLE PRECISION NOT NULL,
+    avg_assists          DOUBLE PRECISION NOT NULL,
+    avg_kda              DOUBLE PRECISION NOT NULL,
+    avg_kp               DOUBLE PRECISION NOT NULL,
+    avg_cs_per_min       DOUBLE PRECISION NOT NULL,
+    avg_gold_per_min     DOUBLE PRECISION NOT NULL,
+    avg_dmg_per_min      DOUBLE PRECISION NOT NULL,
+    avg_physical_dmg     DOUBLE PRECISION NOT NULL,
+    avg_magic_dmg        DOUBLE PRECISION NOT NULL,
+    avg_true_dmg         DOUBLE PRECISION NOT NULL,
+    avg_penta            DOUBLE PRECISION NOT NULL,
+    avg_solo_kills       DOUBLE PRECISION NOT NULL,
+    avg_perf_score       DOUBLE PRECISION NOT NULL,
+
+    -- Build tốt nhất, mỗi phần tử LƯU CẢ COUNT (games/wins) để recompute rate & pure-SQL được.
+    -- best_spell_combos:    [{"s1":Int,"s2":Int,"games":Int,"wins":Int}]  -- spell đã sort s1<s2
+    -- best_runes:           [{"main_style":Int,"sub_style":Int,"key_rune":Int,"runes":[Int],"stat_runes":[Int],"games":Int,"wins":Int}]
+    -- best_legendary_items: [{"item_id":Int,"games":Int,"wins":Int}]      -- lol_items.type = LEGENDARY
+    -- best_boot_items:      [{"item_id":Int,"games":Int,"wins":Int}]      -- lol_items.type = BOOTS
+    -- matchups:             [{"opponent_champion_id":Int,"games":Int,"wins":Int}]  -- đối đầu cùng lane, khác phe
+    best_spell_combos    JSONB NOT NULL DEFAULT '[]',
+    best_runes           JSONB NOT NULL DEFAULT '[]',
+    best_legendary_items JSONB NOT NULL DEFAULT '[]',
+    best_boot_items      JSONB NOT NULL DEFAULT '[]',
+    matchups             JSONB NOT NULL DEFAULT '[]',
+
+    PRIMARY KEY (meta_id, position, champion_id)
+);
+
+-- Tier list: lọc meta + position, sắp theo cỡ mẫu.
+CREATE INDEX IF NOT EXISTS lol_champion_stats_read_idx
+    ON lol_champion_stats (meta_id, position, games DESC);
+
+-- Ban ở cấp TRẬN, không gắn lane => tách riêng theo (meta, champion) thay vì lặp trên mọi dòng
+-- position như bản cũ (hết footgun MAX-vs-SUM). Presence = pick (champion_stats) + ban (bảng này).
+CREATE TABLE IF NOT EXISTS lol_champion_bans (
+    meta_id     UUID    NOT NULL REFERENCES lol_metas (id) ON DELETE CASCADE,
+    champion_id INTEGER NOT NULL,
+    bans        INTEGER NOT NULL,
+    ban_rate    DOUBLE PRECISION NOT NULL,        -- bans / meta.total_matches
+
+    PRIMARY KEY (meta_id, champion_id)
+);

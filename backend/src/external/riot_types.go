@@ -164,9 +164,14 @@ type ParticipantDto struct {
 	Item5 int `json:"item5"`
 	Item6 int `json:"item6"`
 
-	Summoner1Id int      `json:"summoner1Id"`
-	Summoner2Id int      `json:"summoner2Id"`
-	Perks       PerksDto `json:"perks"`
+	Summoner1Id int           `json:"summoner1Id"`
+	Summoner2Id int           `json:"summoner2Id"`
+	Perks       PerksDto      `json:"perks"`
+	Challenges  ChallengesDto `json:"challenges"`
+}
+
+type ChallengesDto struct {
+	SoloKills int `json:"soloKills"`
 }
 
 type PerksDto struct {

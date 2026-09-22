@@ -18,6 +18,42 @@ type LolChampion struct {
 	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
 }
 
+type LolChampionBan struct {
+	MetaID     pgtype.UUID `json:"metaId"`
+	ChampionID int32       `json:"championId"`
+	Bans       int32       `json:"bans"`
+	BanRate    float64     `json:"banRate"`
+}
+
+type LolChampionStat struct {
+	MetaID             pgtype.UUID `json:"metaId"`
+	Position           string      `json:"position"`
+	ChampionID         int32       `json:"championId"`
+	Games              int32       `json:"games"`
+	Wins               int32       `json:"wins"`
+	WinRate            float64     `json:"winRate"`
+	PickRate           float64     `json:"pickRate"`
+	AvgKills           float64     `json:"avgKills"`
+	AvgDeaths          float64     `json:"avgDeaths"`
+	AvgAssists         float64     `json:"avgAssists"`
+	AvgKda             float64     `json:"avgKda"`
+	AvgKp              float64     `json:"avgKp"`
+	AvgCsPerMin        float64     `json:"avgCsPerMin"`
+	AvgGoldPerMin      float64     `json:"avgGoldPerMin"`
+	AvgDmgPerMin       float64     `json:"avgDmgPerMin"`
+	AvgPhysicalDmg     float64     `json:"avgPhysicalDmg"`
+	AvgMagicDmg        float64     `json:"avgMagicDmg"`
+	AvgTrueDmg         float64     `json:"avgTrueDmg"`
+	AvgPenta           float64     `json:"avgPenta"`
+	AvgSoloKills       float64     `json:"avgSoloKills"`
+	AvgPerfScore       float64     `json:"avgPerfScore"`
+	BestSpellCombos    []byte      `json:"bestSpellCombos"`
+	BestRunes          []byte      `json:"bestRunes"`
+	BestLegendaryItems []byte      `json:"bestLegendaryItems"`
+	BestBootItems      []byte      `json:"bestBootItems"`
+	Matchups           []byte      `json:"matchups"`
+}
+
 type LolItem struct {
 	ID              int32              `json:"id"`
 	Name            string             `json:"name"`
@@ -75,6 +111,7 @@ type LolMatchParticipant struct {
 	TripleKills          int16       `json:"tripleKills"`
 	QuadraKills          int16       `json:"quadraKills"`
 	PentaKills           int16       `json:"pentaKills"`
+	SoloKills            int16       `json:"soloKills"`
 	Gold                 int32       `json:"gold"`
 	GoldPerMin           float32     `json:"goldPerMin"`
 	MinionsKilled        int32       `json:"minionsKilled"`
@@ -103,6 +140,15 @@ type LolMatchParticipant struct {
 	Runes                []int32     `json:"runes"`
 	StatRunes            []int32     `json:"statRunes"`
 	Items                []int32     `json:"items"`
+}
+
+type LolMeta struct {
+	ID           pgtype.UUID        `json:"id"`
+	Patch        string             `json:"patch"`
+	Server       string             `json:"server"`
+	RankBucket   string             `json:"rankBucket"`
+	TotalMatches int32              `json:"totalMatches"`
+	UpdatedAt    pgtype.Timestamptz `json:"updatedAt"`
 }
 
 type LolPlayer struct {

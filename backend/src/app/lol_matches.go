@@ -64,6 +64,7 @@ func ToMatch(m db.LolMatch, participants []MatchParticipant) Match {
 }
 
 type MatchParticipant struct {
+	MatchId              string                 `json:"matchId"`
 	Team                 int16                  `json:"team"`
 	IsWin                bool                   `json:"isWin"`
 	PlayerId             string                 `json:"playerId"`
@@ -83,6 +84,7 @@ type MatchParticipant struct {
 	TripleKills          int16                  `json:"tripleKills"`
 	QuadraKills          int16                  `json:"quadraKills"`
 	PentaKills           int16                  `json:"pentaKills"`
+	SoloKills            int16                  `json:"soloKills"`
 	Gold                 int32                  `json:"gold"`
 	GoldPerMin           float32                `json:"goldPerMin"`
 	MinionsKilled        int32                  `json:"minionsKilled"`
@@ -115,6 +117,7 @@ type MatchParticipant struct {
 
 func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 	return MatchParticipant{
+		MatchId:              p.MatchID,
 		Team:                 p.Team,
 		IsWin:                p.IsWin,
 		PlayerId:             p.PlayerID,
@@ -134,6 +137,7 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		TripleKills:          p.TripleKills,
 		QuadraKills:          p.QuadraKills,
 		PentaKills:           p.PentaKills,
+		SoloKills:            p.SoloKills,
 		Gold:                 p.Gold,
 		GoldPerMin:           p.GoldPerMin,
 		MinionsKilled:        p.MinionsKilled,
@@ -474,6 +478,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		TripleKills:          int16(p.TripleKills),
 		QuadraKills:          int16(p.QuadraKills),
 		PentaKills:           int16(p.PentaKills),
+		SoloKills:            int16(p.Challenges.SoloKills),
 		Gold:                 int32(p.GoldEarned),
 		GoldPerMin:           perMinuteOf(p.GoldEarned, durationSec),
 		MinionsKilled:        int32(p.TotalMinionsKilled),

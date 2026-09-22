@@ -12,7 +12,7 @@ import (
 )
 
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
-SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
+SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, solo_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
 ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id
 `
@@ -47,6 +47,7 @@ func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds [
 			&i.TripleKills,
 			&i.QuadraKills,
 			&i.PentaKills,
+			&i.SoloKills,
 			&i.Gold,
 			&i.GoldPerMin,
 			&i.MinionsKilled,

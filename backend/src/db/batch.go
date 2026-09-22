@@ -23,7 +23,7 @@ INSERT INTO lol_match_participants (
     name, tag, rank_power,
     champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
-    double_kills, triple_kills, quadra_kills, penta_kills,
+    double_kills, triple_kills, quadra_kills, penta_kills, solo_kills,
     gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min,
     dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets,
     dmg_taken, heal, heal_others, shield_others,
@@ -34,9 +34,9 @@ INSERT INTO lol_match_participants (
     items
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
-    $39, $40, $41, $42, $43, $44, $45, $46, $47, $48
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+    $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
+    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49
 )
 ON CONFLICT (match_id, player_id) DO NOTHING
 `
@@ -68,6 +68,7 @@ type InsertMatchParticipantsParams struct {
 	TripleKills          int16       `json:"tripleKills"`
 	QuadraKills          int16       `json:"quadraKills"`
 	PentaKills           int16       `json:"pentaKills"`
+	SoloKills            int16       `json:"soloKills"`
 	Gold                 int32       `json:"gold"`
 	GoldPerMin           float32     `json:"goldPerMin"`
 	MinionsKilled        int32       `json:"minionsKilled"`
@@ -123,6 +124,7 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.TripleKills,
 			a.QuadraKills,
 			a.PentaKills,
+			a.SoloKills,
 			a.Gold,
 			a.GoldPerMin,
 			a.MinionsKilled,
