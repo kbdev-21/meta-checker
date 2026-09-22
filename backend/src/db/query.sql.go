@@ -11,6 +11,150 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countSliceMatches = `-- name: CountSliceMatches :one
+
+SELECT count(*) FROM lol_matches m
+WHERE m.patch = $1::text
+  AND m.mode = 'SOLO'
+  AND NOT m.is_remake
+  AND m.duration_sec >= $2::int
+  AND m.estimated_rank = ANY($3::text[])
+  AND ($4::text = 'GLOBAL' OR m.server = $4::text)
+`
+
+type CountSliceMatchesParams struct {
+	Patch       string   `json:"patch"`
+	MinDuration int32    `json:"minDuration"`
+	Ranks       []string `json:"ranks"`
+	Server      string   `json:"server"`
+}
+
+// ============================================================
+// ANALYTICS
+// Lọc match hợp lệ của 1 lát cắt luôn cùng bộ điều kiện: patch + mode ranked +
+// không remake + đủ dài + đúng rank bucket + (GLOBAL hoặc đúng server).
+// ============================================================
+func (q *Queries) CountSliceMatches(ctx context.Context, arg CountSliceMatchesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSliceMatches,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteChampionBansByMeta = `-- name: DeleteChampionBansByMeta :exec
+DELETE FROM lol_champion_bans WHERE meta_id = $1::uuid
+`
+
+func (q *Queries) DeleteChampionBansByMeta(ctx context.Context, metaID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChampionBansByMeta, metaID)
+	return err
+}
+
+const deleteChampionStatsByMeta = `-- name: DeleteChampionStatsByMeta :exec
+DELETE FROM lol_champion_stats WHERE meta_id = $1::uuid
+`
+
+func (q *Queries) DeleteChampionStatsByMeta(ctx context.Context, metaID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChampionStatsByMeta, metaID)
+	return err
+}
+
+const getChampionStatsByMeta = `-- name: GetChampionStatsByMeta :many
+SELECT cs.meta_id, cs.position, cs.champion_id, cs.champion_slug, cs.games, cs.wins, cs.win_rate, cs.pick_rate, cs.avg_kills, cs.avg_deaths, cs.avg_assists, cs.avg_kda, cs.avg_kp, cs.avg_cs_per_min, cs.avg_gold_per_min, cs.avg_dmg_per_min, cs.avg_physical_dmg, cs.avg_magic_dmg, cs.avg_true_dmg, cs.avg_penta, cs.avg_solo_kills, cs.avg_perf_score, cs.best_spell_combos, cs.best_runes, cs.best_legendary_items, cs.best_boot_items, cs.matchups, COALESCE(b.bans, 0)::int AS bans, COALESCE(b.ban_rate, 0)::float8 AS ban_rate
+FROM lol_champion_stats cs
+LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
+WHERE cs.meta_id = $1::uuid
+ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC
+`
+
+type GetChampionStatsByMetaRow struct {
+	MetaID             pgtype.UUID `json:"metaId"`
+	Position           string      `json:"position"`
+	ChampionID         int32       `json:"championId"`
+	ChampionSlug       string      `json:"championSlug"`
+	Games              int32       `json:"games"`
+	Wins               int32       `json:"wins"`
+	WinRate            float64     `json:"winRate"`
+	PickRate           float64     `json:"pickRate"`
+	AvgKills           float64     `json:"avgKills"`
+	AvgDeaths          float64     `json:"avgDeaths"`
+	AvgAssists         float64     `json:"avgAssists"`
+	AvgKda             float64     `json:"avgKda"`
+	AvgKp              float64     `json:"avgKp"`
+	AvgCsPerMin        float64     `json:"avgCsPerMin"`
+	AvgGoldPerMin      float64     `json:"avgGoldPerMin"`
+	AvgDmgPerMin       float64     `json:"avgDmgPerMin"`
+	AvgPhysicalDmg     float64     `json:"avgPhysicalDmg"`
+	AvgMagicDmg        float64     `json:"avgMagicDmg"`
+	AvgTrueDmg         float64     `json:"avgTrueDmg"`
+	AvgPenta           float64     `json:"avgPenta"`
+	AvgSoloKills       float64     `json:"avgSoloKills"`
+	AvgPerfScore       float64     `json:"avgPerfScore"`
+	BestSpellCombos    []byte      `json:"bestSpellCombos"`
+	BestRunes          []byte      `json:"bestRunes"`
+	BestLegendaryItems []byte      `json:"bestLegendaryItems"`
+	BestBootItems      []byte      `json:"bestBootItems"`
+	Matchups           []byte      `json:"matchups"`
+	Bans               int32       `json:"bans"`
+	BanRate            float64     `json:"banRate"`
+}
+
+// Đọc champion stats của 1 meta kèm ban (ban theo champion, join mọi position của tướng đó).
+func (q *Queries) GetChampionStatsByMeta(ctx context.Context, metaID pgtype.UUID) ([]GetChampionStatsByMetaRow, error) {
+	rows, err := q.db.Query(ctx, getChampionStatsByMeta, metaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetChampionStatsByMetaRow
+	for rows.Next() {
+		var i GetChampionStatsByMetaRow
+		if err := rows.Scan(
+			&i.MetaID,
+			&i.Position,
+			&i.ChampionID,
+			&i.ChampionSlug,
+			&i.Games,
+			&i.Wins,
+			&i.WinRate,
+			&i.PickRate,
+			&i.AvgKills,
+			&i.AvgDeaths,
+			&i.AvgAssists,
+			&i.AvgKda,
+			&i.AvgKp,
+			&i.AvgCsPerMin,
+			&i.AvgGoldPerMin,
+			&i.AvgDmgPerMin,
+			&i.AvgPhysicalDmg,
+			&i.AvgMagicDmg,
+			&i.AvgTrueDmg,
+			&i.AvgPenta,
+			&i.AvgSoloKills,
+			&i.AvgPerfScore,
+			&i.BestSpellCombos,
+			&i.BestRunes,
+			&i.BestLegendaryItems,
+			&i.BestBootItems,
+			&i.Matchups,
+			&i.Bans,
+			&i.BanRate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
 SELECT match_id, team, is_win, player_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, solo_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
@@ -132,6 +276,31 @@ func (q *Queries) GetMatchesByIds(ctx context.Context, ids []string) ([]LolMatch
 		return nil, err
 	}
 	return items, nil
+}
+
+const getMeta = `-- name: GetMeta :one
+SELECT id, patch, server, rank_bucket, total_matches, updated_at FROM lol_metas
+WHERE patch = $1::text AND server = $2::text AND rank_bucket = $3::text
+`
+
+type GetMetaParams struct {
+	Patch      string `json:"patch"`
+	Server     string `json:"server"`
+	RankBucket string `json:"rankBucket"`
+}
+
+func (q *Queries) GetMeta(ctx context.Context, arg GetMetaParams) (LolMeta, error) {
+	row := q.db.QueryRow(ctx, getMeta, arg.Patch, arg.Server, arg.RankBucket)
+	var i LolMeta
+	err := row.Scan(
+		&i.ID,
+		&i.Patch,
+		&i.Server,
+		&i.RankBucket,
+		&i.TotalMatches,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getPlayerById = `-- name: GetPlayerById :one
@@ -392,6 +561,407 @@ func (q *Queries) ListSpells(ctx context.Context) ([]LolSpell, error) {
 	return items, nil
 }
 
+const refreshChampionBans = `-- name: RefreshChampionBans :exec
+INSERT INTO lol_champion_bans (meta_id, champion_id, bans, ban_rate)
+SELECT $1::uuid, ban.champion_id, count(*),
+       count(*)::float8 / nullif($2::int, 0)
+FROM (
+    SELECT unnest(m.banned_champion_ids) AS champion_id
+    FROM lol_matches m
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+) ban
+WHERE ban.champion_id >= 0
+GROUP BY ban.champion_id
+`
+
+type RefreshChampionBansParams struct {
+	MetaID       pgtype.UUID `json:"metaId"`
+	TotalMatches int32       `json:"totalMatches"`
+	Patch        string      `json:"patch"`
+	MinDuration  int32       `json:"minDuration"`
+	Ranks        []string    `json:"ranks"`
+	Server       string      `json:"server"`
+}
+
+// Ban ở cấp trận: unnest banned_champion_ids (đã bỏ -1 lúc lưu).
+func (q *Queries) RefreshChampionBans(ctx context.Context, arg RefreshChampionBansParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionBans,
+		arg.MetaID,
+		arg.TotalMatches,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsBootItems = `-- name: RefreshChampionStatsBootItems :exec
+WITH item_rows AS (
+    SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    CROSS JOIN LATERAL unnest(p.items) AS iid
+    JOIN lol_items it ON it.id = iid AND it.type = 'BOOTS'
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, item_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM item_rows
+    GROUP BY position, champion_id, item_id
+)
+UPDATE lol_champion_stats cs
+SET best_boot_items = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'itemId', item_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= $2::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = $1::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id
+`
+
+type RefreshChampionStatsBootItemsParams struct {
+	MetaID      pgtype.UUID `json:"metaId"`
+	TopN        int32       `json:"topN"`
+	Patch       string      `json:"patch"`
+	MinDuration int32       `json:"minDuration"`
+	Ranks       []string    `json:"ranks"`
+	Server      string      `json:"server"`
+}
+
+func (q *Queries) RefreshChampionStatsBootItems(ctx context.Context, arg RefreshChampionStatsBootItemsParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsBootItems,
+		arg.MetaID,
+		arg.TopN,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsLegendaryItems = `-- name: RefreshChampionStatsLegendaryItems :exec
+WITH item_rows AS (
+    SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    CROSS JOIN LATERAL unnest(p.items) AS iid
+    JOIN lol_items it ON it.id = iid AND it.type = 'LEGENDARY'
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, item_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM item_rows
+    GROUP BY position, champion_id, item_id
+)
+UPDATE lol_champion_stats cs
+SET best_legendary_items = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'itemId', item_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= $2::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = $1::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id
+`
+
+type RefreshChampionStatsLegendaryItemsParams struct {
+	MetaID      pgtype.UUID `json:"metaId"`
+	TopN        int32       `json:"topN"`
+	Patch       string      `json:"patch"`
+	MinDuration int32       `json:"minDuration"`
+	Ranks       []string    `json:"ranks"`
+	Server      string      `json:"server"`
+}
+
+// Item legendary: unnest items rồi lọc theo lol_items.type.
+func (q *Queries) RefreshChampionStatsLegendaryItems(ctx context.Context, arg RefreshChampionStatsLegendaryItemsParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsLegendaryItems,
+		arg.MetaID,
+		arg.TopN,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsMatchups = `-- name: RefreshChampionStatsMatchups :exec
+WITH mp AS (
+    SELECT p.match_id, p.team, p.position, p.champion_id, p.is_win
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+),
+pairs AS (
+    SELECT me.position, me.champion_id, opp.champion_id AS opponent_champion_id, me.is_win
+    FROM mp me
+    JOIN mp opp ON opp.match_id = me.match_id AND opp.position = me.position AND opp.team <> me.team
+),
+ranked AS (
+    SELECT position, champion_id, opponent_champion_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM pairs
+    GROUP BY position, champion_id, opponent_champion_id
+)
+UPDATE lol_champion_stats cs
+SET matchups = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'opponentChampionId', opponent_champion_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= $2::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = $1::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id
+`
+
+type RefreshChampionStatsMatchupsParams struct {
+	MetaID      pgtype.UUID `json:"metaId"`
+	TopN        int32       `json:"topN"`
+	Patch       string      `json:"patch"`
+	MinDuration int32       `json:"minDuration"`
+	Ranks       []string    `json:"ranks"`
+	Server      string      `json:"server"`
+}
+
+// Matchup: self-join participant cùng match, cùng position, khác phe.
+func (q *Queries) RefreshChampionStatsMatchups(ctx context.Context, arg RefreshChampionStatsMatchupsParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsMatchups,
+		arg.MetaID,
+		arg.TopN,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsRunes = `-- name: RefreshChampionStatsRunes :exec
+WITH mp AS (
+    SELECT p.position, p.champion_id, p.is_win,
+           p.rune_primary_style, p.rune_sub_style, p.key_rune, p.runes, p.stat_runes
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM mp
+    GROUP BY position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes
+)
+UPDATE lol_champion_stats cs
+SET best_runes = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'runePrimaryStyle', rune_primary_style, 'runeSubStyle', rune_sub_style,
+               'keyRune', key_rune, 'runes', to_jsonb(runes), 'statRunes', to_jsonb(stat_runes),
+               'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= $2::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = $1::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id
+`
+
+type RefreshChampionStatsRunesParams struct {
+	MetaID      pgtype.UUID `json:"metaId"`
+	TopN        int32       `json:"topN"`
+	Patch       string      `json:"patch"`
+	MinDuration int32       `json:"minDuration"`
+	Ranks       []string    `json:"ranks"`
+	Server      string      `json:"server"`
+}
+
+func (q *Queries) RefreshChampionStatsRunes(ctx context.Context, arg RefreshChampionStatsRunesParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsRunes,
+		arg.MetaID,
+		arg.TopN,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsScalars = `-- name: RefreshChampionStatsScalars :exec
+INSERT INTO lol_champion_stats (
+    meta_id, position, champion_id, champion_slug,
+    games, wins, win_rate, pick_rate,
+    avg_kills, avg_deaths, avg_assists, avg_kda, avg_kp,
+    avg_cs_per_min, avg_gold_per_min, avg_dmg_per_min,
+    avg_physical_dmg, avg_magic_dmg, avg_true_dmg,
+    avg_penta, avg_solo_kills, avg_perf_score
+)
+SELECT
+    $1::uuid, mp.position, mp.champion_id, max(mp.champion_slug),
+    count(*),
+    count(*) FILTER (WHERE mp.is_win),
+    count(*) FILTER (WHERE mp.is_win)::float8 / count(*),
+    count(*)::float8 / nullif($2::int, 0),
+    avg(mp.kills), avg(mp.deaths), avg(mp.assists), avg(mp.kda), avg(mp.kill_participation),
+    avg(mp.cs_per_min), avg(mp.gold_per_min), avg(mp.dmg_per_min),
+    avg(mp.physical_dmg_dealt), avg(mp.magic_dmg_dealt), avg(mp.true_dmg_dealt),
+    avg(mp.penta_kills), avg(mp.solo_kills), avg(mp.perf_score)
+FROM (
+    SELECT p.match_id, p.team, p.is_win, p.player_id, p.name, p.tag, p.rank_power, p.champion_id, p.champion_slug, p.champ_level, p.position, p.kills, p.deaths, p.assists, p.kda, p.kill_participation, p.double_kills, p.triple_kills, p.quadra_kills, p.penta_kills, p.solo_kills, p.gold, p.gold_per_min, p.minions_killed, p.neutral_minions_killed, p.cs, p.cs_per_min, p.dmg_dealt, p.dmg_per_min, p.physical_dmg_dealt, p.magic_dmg_dealt, p.true_dmg_dealt, p.dmg_to_turrets, p.dmg_taken, p.heal, p.heal_others, p.shield_others, p.vision_score, p.wards_placed, p.wards_killed, p.perf_score, p.spell1_id, p.spell2_id, p.rune_primary_style, p.rune_sub_style, p.key_rune, p.runes, p.stat_runes, p.items
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+) mp
+GROUP BY mp.position, mp.champion_id
+`
+
+type RefreshChampionStatsScalarsParams struct {
+	MetaID       pgtype.UUID `json:"metaId"`
+	TotalMatches int32       `json:"totalMatches"`
+	Patch        string      `json:"patch"`
+	MinDuration  int32       `json:"minDuration"`
+	Ranks        []string    `json:"ranks"`
+	Server       string      `json:"server"`
+}
+
+// Scalar aggregate. Cột JSONB để DEFAULT '[]', các query Refresh...* bên dưới điền sau.
+// avg_x lưu trung bình có trọng số theo participant; gộp nhiều dòng sau này dùng SUM(avg_x*games)/SUM(games).
+func (q *Queries) RefreshChampionStatsScalars(ctx context.Context, arg RefreshChampionStatsScalarsParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsScalars,
+		arg.MetaID,
+		arg.TotalMatches,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
+const refreshChampionStatsSpellCombos = `-- name: RefreshChampionStatsSpellCombos :exec
+WITH mp AS (
+    SELECT p.position, p.champion_id, p.is_win, p.spell1_id, p.spell2_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = $3::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= $4::int
+      AND m.estimated_rank = ANY($5::text[])
+      AND ($6::text = 'GLOBAL' OR m.server = $6::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, spell1_id, spell2_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM mp
+    GROUP BY position, champion_id, spell1_id, spell2_id
+)
+UPDATE lol_champion_stats cs
+SET best_spell_combos = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'spell1Id', spell1_id, 'spell2Id', spell2_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= $2::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = $1::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id
+`
+
+type RefreshChampionStatsSpellCombosParams struct {
+	MetaID      pgtype.UUID `json:"metaId"`
+	TopN        int32       `json:"topN"`
+	Patch       string      `json:"patch"`
+	MinDuration int32       `json:"minDuration"`
+	Ranks       []string    `json:"ranks"`
+	Server      string      `json:"server"`
+}
+
+func (q *Queries) RefreshChampionStatsSpellCombos(ctx context.Context, arg RefreshChampionStatsSpellCombosParams) error {
+	_, err := q.db.Exec(ctx, refreshChampionStatsSpellCombos,
+		arg.MetaID,
+		arg.TopN,
+		arg.Patch,
+		arg.MinDuration,
+		arg.Ranks,
+		arg.Server,
+	)
+	return err
+}
+
 const searchPlayers = `-- name: SearchPlayers :many
 SELECT id, server, name, tag, normalized_name, normalized_tag, profile_icon_id, level, search_string, solo_rank, solo_tier, solo_lp, solo_rank_power, solo_wins, solo_losses, flex_rank, flex_tier, flex_lp, flex_wins, flex_losses, created_at, updated_at FROM lol_players
 WHERE name ILIKE '%' || $1::text || '%'
@@ -526,6 +1096,35 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) error {
 		arg.Patch,
 	)
 	return err
+}
+
+const upsertMeta = `-- name: UpsertMeta :one
+INSERT INTO lol_metas (patch, server, rank_bucket, total_matches)
+VALUES ($1::text, $2::text, $3::text, $4::int)
+ON CONFLICT (patch, server, rank_bucket) DO UPDATE SET
+    total_matches = EXCLUDED.total_matches,
+    updated_at    = now()
+RETURNING id
+`
+
+type UpsertMetaParams struct {
+	Patch        string `json:"patch"`
+	Server       string `json:"server"`
+	RankBucket   string `json:"rankBucket"`
+	TotalMatches int32  `json:"totalMatches"`
+}
+
+// Upsert theo khóa tự nhiên: id giữ nguyên qua mỗi lần refresh.
+func (q *Queries) UpsertMeta(ctx context.Context, arg UpsertMetaParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertMeta,
+		arg.Patch,
+		arg.Server,
+		arg.RankBucket,
+		arg.TotalMatches,
+	)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const upsertPlayer = `-- name: UpsertPlayer :exec

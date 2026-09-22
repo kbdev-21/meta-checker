@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"log"
 	"net/url"
 	"strconv"
@@ -27,6 +28,9 @@ func InitLolApiRoutes(fib *fiber.App, a *app.Application) {
 	fib.Post("/api/lol/players/by-info/:server/:name/:tag/update", updatePlayerByInfoApiHandler(a))
 
 	fib.Get("/api/lol/matches/by-player-info/:server/:name/:tag", getMatchesByPlayerInfoApiHandler(a))
+
+	fib.Post("/api/lol/analytics/start-update", startAnalyticsUpdateApiHandler(a))
+	fib.Get("/api/lol/analytics", getAnalyticsApiHandler(a))
 }
 
 // GET /api/lol/players?q=...
@@ -108,7 +112,57 @@ func getMatchesByPlayerInfoApiHandler(a *app.Application) func(ctx fiber.Ctx) er
 	}
 }
 
+// POST /api/lol/analytics/start-update
+// Chạy update nền rồi trả luôn (dùng để test, chưa có sched).
+func startAnalyticsUpdateApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
+		go func() {
+			err := a.UpdateAnalytics(context.Background())
+			if err != nil {
+				log.Printf("update analytics: %v", err)
+			} else {
+				log.Println("update analytics success")
+			}
+		}()
+		return ctx.JSON(fiber.Map{"message": "Started!"})
+	}
+}
+
+// GET /api/lol/analytics?server=GLOBAL&rankBucket=MASTER_PLUS
+// Chưa tổng hợp cho patch hiện tại => 404.
+func getAnalyticsApiHandler(a *app.Application) func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
+		server, bucket, err := analyticsParams(ctx)
+		if err != nil {
+			return err
+		}
+
+		meta, err := a.GetAnalytics(ctx.Context(), server, bucket)
+		if err != nil {
+			log.Printf("get analytics %s/%s: %v", server, bucket, err)
+			return err
+		}
+		if meta.IsNull {
+			return ctx.SendStatus(fiber.StatusNotFound)
+		}
+		return ctx.JSON(meta.Value)
+	}
+}
+
 // ---------- private ----------
+
+// Đọc ?server&rankBucket. Input sai => *fiber.Error 400.
+func analyticsParams(ctx fiber.Ctx) (server string, bucket app.RankBucket, err error) {
+	server = strings.ToUpper(ctx.Query("server"))
+	if !app.IsValidMetaServer(server) {
+		return "", "", fiber.NewError(fiber.StatusBadRequest, "invalid server")
+	}
+	bucket = app.RankBucket(strings.ToUpper(ctx.Query("rankBucket")))
+	if !bucket.IsValid() {
+		return "", "", fiber.NewError(fiber.StatusBadRequest, "invalid rankBucket")
+	}
+	return server, bucket, nil
+}
 
 // Đọc :server/:name/:tag. Input sai => *fiber.Error 400.
 func playerInfoParams(ctx fiber.Ctx) (server app.Server, name, tag string, err error) {

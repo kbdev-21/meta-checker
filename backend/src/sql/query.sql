@@ -160,3 +160,293 @@ ORDER BY game_start_at DESC;
 SELECT * FROM lol_match_participants
 WHERE match_id = ANY(sqlc.arg(match_ids)::text[])
 ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id;
+
+
+-- ============================================================
+-- ANALYTICS
+-- Lọc match hợp lệ của 1 lát cắt luôn cùng bộ điều kiện: patch + mode ranked +
+-- không remake + đủ dài + đúng rank bucket + (GLOBAL hoặc đúng server).
+-- ============================================================
+
+-- name: CountSliceMatches :one
+SELECT count(*) FROM lol_matches m
+WHERE m.patch = sqlc.arg(patch)::text
+  AND m.mode = 'SOLO'
+  AND NOT m.is_remake
+  AND m.duration_sec >= sqlc.arg(min_duration)::int
+  AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+  AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text);
+
+-- Upsert theo khóa tự nhiên: id giữ nguyên qua mỗi lần refresh.
+-- name: UpsertMeta :one
+INSERT INTO lol_metas (patch, server, rank_bucket, total_matches)
+VALUES (sqlc.arg(patch)::text, sqlc.arg(server)::text, sqlc.arg(rank_bucket)::text, sqlc.arg(total_matches)::int)
+ON CONFLICT (patch, server, rank_bucket) DO UPDATE SET
+    total_matches = EXCLUDED.total_matches,
+    updated_at    = now()
+RETURNING id;
+
+-- name: GetMeta :one
+SELECT * FROM lol_metas
+WHERE patch = sqlc.arg(patch)::text AND server = sqlc.arg(server)::text AND rank_bucket = sqlc.arg(rank_bucket)::text;
+
+-- name: DeleteChampionStatsByMeta :exec
+DELETE FROM lol_champion_stats WHERE meta_id = sqlc.arg(meta_id)::uuid;
+
+-- name: DeleteChampionBansByMeta :exec
+DELETE FROM lol_champion_bans WHERE meta_id = sqlc.arg(meta_id)::uuid;
+
+-- Scalar aggregate. Cột JSONB để DEFAULT '[]', các query Refresh...* bên dưới điền sau.
+-- avg_x lưu trung bình có trọng số theo participant; gộp nhiều dòng sau này dùng SUM(avg_x*games)/SUM(games).
+-- name: RefreshChampionStatsScalars :exec
+INSERT INTO lol_champion_stats (
+    meta_id, position, champion_id, champion_slug,
+    games, wins, win_rate, pick_rate,
+    avg_kills, avg_deaths, avg_assists, avg_kda, avg_kp,
+    avg_cs_per_min, avg_gold_per_min, avg_dmg_per_min,
+    avg_physical_dmg, avg_magic_dmg, avg_true_dmg,
+    avg_penta, avg_solo_kills, avg_perf_score
+)
+SELECT
+    sqlc.arg(meta_id)::uuid, mp.position, mp.champion_id, max(mp.champion_slug),
+    count(*),
+    count(*) FILTER (WHERE mp.is_win),
+    count(*) FILTER (WHERE mp.is_win)::float8 / count(*),
+    count(*)::float8 / nullif(sqlc.arg(total_matches)::int, 0),
+    avg(mp.kills), avg(mp.deaths), avg(mp.assists), avg(mp.kda), avg(mp.kill_participation),
+    avg(mp.cs_per_min), avg(mp.gold_per_min), avg(mp.dmg_per_min),
+    avg(mp.physical_dmg_dealt), avg(mp.magic_dmg_dealt), avg(mp.true_dmg_dealt),
+    avg(mp.penta_kills), avg(mp.solo_kills), avg(mp.perf_score)
+FROM (
+    SELECT p.*
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+) mp
+GROUP BY mp.position, mp.champion_id;
+
+-- name: RefreshChampionStatsSpellCombos :exec
+WITH mp AS (
+    SELECT p.position, p.champion_id, p.is_win, p.spell1_id, p.spell2_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, spell1_id, spell2_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM mp
+    GROUP BY position, champion_id, spell1_id, spell2_id
+)
+UPDATE lol_champion_stats cs
+SET best_spell_combos = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'spell1Id', spell1_id, 'spell2Id', spell2_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= sqlc.arg(top_n)::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id;
+
+-- name: RefreshChampionStatsRunes :exec
+WITH mp AS (
+    SELECT p.position, p.champion_id, p.is_win,
+           p.rune_primary_style, p.rune_sub_style, p.key_rune, p.runes, p.stat_runes
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM mp
+    GROUP BY position, champion_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes
+)
+UPDATE lol_champion_stats cs
+SET best_runes = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'runePrimaryStyle', rune_primary_style, 'runeSubStyle', rune_sub_style,
+               'keyRune', key_rune, 'runes', to_jsonb(runes), 'statRunes', to_jsonb(stat_runes),
+               'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= sqlc.arg(top_n)::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id;
+
+-- Item legendary: unnest items rồi lọc theo lol_items.type.
+-- name: RefreshChampionStatsLegendaryItems :exec
+WITH item_rows AS (
+    SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    CROSS JOIN LATERAL unnest(p.items) AS iid
+    JOIN lol_items it ON it.id = iid AND it.type = 'LEGENDARY'
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, item_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM item_rows
+    GROUP BY position, champion_id, item_id
+)
+UPDATE lol_champion_stats cs
+SET best_legendary_items = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'itemId', item_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= sqlc.arg(top_n)::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id;
+
+-- name: RefreshChampionStatsBootItems :exec
+WITH item_rows AS (
+    SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    CROSS JOIN LATERAL unnest(p.items) AS iid
+    JOIN lol_items it ON it.id = iid AND it.type = 'BOOTS'
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+),
+ranked AS (
+    SELECT position, champion_id, item_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM item_rows
+    GROUP BY position, champion_id, item_id
+)
+UPDATE lol_champion_stats cs
+SET best_boot_items = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'itemId', item_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= sqlc.arg(top_n)::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id;
+
+-- Matchup: self-join participant cùng match, cùng position, khác phe.
+-- name: RefreshChampionStatsMatchups :exec
+WITH mp AS (
+    SELECT p.match_id, p.team, p.position, p.champion_id, p.is_win
+    FROM lol_match_participants p
+    JOIN lol_matches m ON m.id = p.match_id
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+      AND p.position <> 'UNK'
+),
+pairs AS (
+    SELECT me.position, me.champion_id, opp.champion_id AS opponent_champion_id, me.is_win
+    FROM mp me
+    JOIN mp opp ON opp.match_id = me.match_id AND opp.position = me.position AND opp.team <> me.team
+),
+ranked AS (
+    SELECT position, champion_id, opponent_champion_id,
+           count(*) AS games,
+           count(*) FILTER (WHERE is_win) AS wins,
+           row_number() OVER (PARTITION BY position, champion_id ORDER BY count(*) DESC) AS rn
+    FROM pairs
+    GROUP BY position, champion_id, opponent_champion_id
+)
+UPDATE lol_champion_stats cs
+SET matchups = sub.arr
+FROM (
+    SELECT position, champion_id,
+           jsonb_agg(jsonb_build_object(
+               'opponentChampionId', opponent_champion_id, 'games', games, 'wins', wins
+           ) ORDER BY games DESC) AS arr
+    FROM ranked
+    WHERE rn <= sqlc.arg(top_n)::int
+    GROUP BY position, champion_id
+) sub
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+  AND cs.position = sub.position
+  AND cs.champion_id = sub.champion_id;
+
+-- Ban ở cấp trận: unnest banned_champion_ids (đã bỏ -1 lúc lưu).
+-- name: RefreshChampionBans :exec
+INSERT INTO lol_champion_bans (meta_id, champion_id, bans, ban_rate)
+SELECT sqlc.arg(meta_id)::uuid, ban.champion_id, count(*),
+       count(*)::float8 / nullif(sqlc.arg(total_matches)::int, 0)
+FROM (
+    SELECT unnest(m.banned_champion_ids) AS champion_id
+    FROM lol_matches m
+    WHERE m.patch = sqlc.arg(patch)::text
+      AND m.mode = 'SOLO'
+      AND NOT m.is_remake
+      AND m.duration_sec >= sqlc.arg(min_duration)::int
+      AND m.estimated_rank = ANY(sqlc.arg(ranks)::text[])
+      AND (sqlc.arg(server)::text = 'GLOBAL' OR m.server = sqlc.arg(server)::text)
+) ban
+WHERE ban.champion_id >= 0
+GROUP BY ban.champion_id;
+
+-- Đọc champion stats của 1 meta kèm ban (ban theo champion, join mọi position của tướng đó).
+-- name: GetChampionStatsByMeta :many
+SELECT cs.*, COALESCE(b.bans, 0)::int AS bans, COALESCE(b.ban_rate, 0)::float8 AS ban_rate
+FROM lol_champion_stats cs
+LEFT JOIN lol_champion_bans b ON b.meta_id = cs.meta_id AND b.champion_id = cs.champion_id
+WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
+ORDER BY array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], cs.position), cs.games DESC;
