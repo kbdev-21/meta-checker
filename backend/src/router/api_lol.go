@@ -18,7 +18,7 @@ const playerSearchLimit = 20
 // count mặc định / tối đa cho list match; giới hạn để 1 request không gọi Riot quá nhiều.
 const (
 	matchListDefaultCount = 10
-	matchListMaxCount     = 10
+	matchListMaxCount     = 20
 )
 
 func InitLolApiRoutes(fib *fiber.App, a *app.Application) {

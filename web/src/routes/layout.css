@@ -1,1 +1,41 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/ibm-plex-sans';
+
+/* Dark-only. Nền xám trung tính (không đen tuyệt đối), accent vàng dùng tiết chế:
+   chỉ ở logo mark, item đang chọn và focus ring. */
+@theme {
+	/* Fontsource tách @font-face theo unicode-range nên file subset vietnamese chỉ
+	   được tải khi trang thật sự có dấu. Tailwind lấy --font-sans làm font mặc định
+	   của html (--default-font-family), nên không cần set font-family ở body. */
+	--font-sans:
+		'IBM Plex Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+	--color-base: #17181c; /* nền trang */
+	--color-surface: #1d1f24; /* header, card */
+	--color-elevated: #26282e; /* dropdown, input, hover */
+	--color-line: #31343b; /* viền */
+	--color-ink: #e7e8ea; /* chữ chính */
+	--color-muted: #9497a0; /* chữ phụ, icon */
+	--color-accent: #e5b53c;
+}
+
+:root {
+	color-scheme: dark;
+}
+
+body {
+	background-color: var(--color-base);
+	color: var(--color-ink);
+}
+
+/* Tailwind v4 bỏ cursor: pointer mặc định của button, trả lại cho mọi thứ clickable.
+   Để trong @layer base nên class cursor-* trên từng element vẫn override được. */
+@layer base {
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	select:not(:disabled),
+	summary,
+	label[for] {
+		cursor: pointer;
+	}
+}

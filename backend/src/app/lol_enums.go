@@ -198,23 +198,29 @@ type GameMode string
 const (
 	GameModeSolo   GameMode = "SOLO"   // queue 420
 	GameModeFlex   GameMode = "FLEX"   // queue 440
-	GameModeAram   GameMode = "ARAM"   // map 12 (Howling Abyss)
+	GameModeAram   GameMode = "ARAM"   // queue 450 | 100 | 720 | 2400
 	GameModeNormal GameMode = "NORMAL" // còn lại
 )
 
 const (
 	riotQueueRankedSolo = 420
 	riotQueueRankedFlex = 440
-	riotMapHowlingAbyss = 12
+	riotQueueAramAbyss  = 450  // 5v5 ARAM, map Howling Abyss
+	riotQueueAramBridge = 100  // 5v5 ARAM, map Butcher's Bridge
+	riotQueueAramClash  = 720  // ARAM Clash
+	riotQueueAramMayhem = 2400 // ARAM: Mayhem
 )
 
-func gameModeOf(queueId, mapId int) GameMode {
-	switch {
-	case queueId == riotQueueRankedSolo:
+// Nhận diện theo queue id chứ không theo map: ARAM chạy trên nhiều map (Howling Abyss,
+// Butcher's Bridge, map event mới), ngược lại Howling Abyss còn có mode không phải ARAM
+// (Poro King, One For All, Snowdown) - những mode đó tính là NORMAL.
+func gameModeOf(queueId int) GameMode {
+	switch queueId {
+	case riotQueueRankedSolo:
 		return GameModeSolo
-	case queueId == riotQueueRankedFlex:
+	case riotQueueRankedFlex:
 		return GameModeFlex
-	case mapId == riotMapHowlingAbyss:
+	case riotQueueAramAbyss, riotQueueAramBridge, riotQueueAramClash, riotQueueAramMayhem:
 		return GameModeAram
 	}
 	return GameModeNormal

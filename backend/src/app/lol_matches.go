@@ -354,7 +354,7 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 	matchParams := db.InsertMatchesParams{
 		ID:                match.Metadata.MatchId,
 		Server:            server,
-		Mode:              string(gameModeOf(info.QueueId, info.MapId)),
+		Mode:              string(gameModeOf(info.QueueId)),
 		Patch:             shared.PatchOf(info.GameVersion),
 		GameStartAt:       pgtype.Timestamptz{Time: time.UnixMilli(info.GameStartTimestamp), Valid: true},
 		DurationSec:       int32(info.GameDuration),

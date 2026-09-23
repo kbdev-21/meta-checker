@@ -11,7 +11,12 @@ export default defineConfig({
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			// Route không prerender được (vd trang player) => build ra 200.html làm SPA fallback;
+			// host tĩnh phải cấu hình trả file này cho URL không có file tương ứng.
+			adapter: adapter({ fallback: '200.html' })
 		})
-	]
+	],
+	// @lucide/svelte re-export file .svelte từ dist; không noExternal thì SSR để Node
+	// import thẳng .svelte và chết ERR_UNKNOWN_FILE_EXTENSION.
+	ssr: { noExternal: ['@lucide/svelte'] }
 });
