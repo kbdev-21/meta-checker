@@ -21,6 +21,6 @@ func StartCrawlLolMatchesSched(a *app.Application) {
 func startCrawler(a *app.Application, cr *app.Crawler) {
 	for {
 		_ = a.CrawlMatches(context.Background(), cr)
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }

@@ -11,12 +11,13 @@ import (
 )
 
 type Application struct {
-	cfg     config.Config
-	p       *pgxpool.Pool // dùng khi cần transaction: q.WithTx(tx)
-	q       *db.Queries
+	cfg config.Config
+	p   *pgxpool.Pool // dùng khi cần transaction: q.WithTx(tx)
+	q   *db.Queries
 
-	riot    *external.RiotClient
-	ddragon *external.DDragonClient
+	riot         *external.RiotClient
+	riotTimeline *external.RiotClient // key riêng, CHỈ dùng fetch timeline: puuid trả về khác key chính
+	ddragon      *external.DDragonClient
 }
 
 func NewApplication(ctx context.Context, cfg config.Config) (*Application, error) {
@@ -32,10 +33,11 @@ func NewApplication(ctx context.Context, cfg config.Config) (*Application, error
 	}
 
 	return &Application{
-		cfg:     cfg,
-		p:       p,
-		q:       db.New(p),
-		riot:    external.NewRiotClient(cfg.RiotApiKey, cfg.RiotRatePerSec, cfg.RiotRatePer2Min),
-		ddragon: external.NewDDragonClient(),
+		cfg:          cfg,
+		p:            p,
+		q:            db.New(p),
+		riot:         external.NewRiotClient(cfg.RiotApiKey, cfg.RiotRatePerSec, cfg.RiotRatePer2Min),
+		riotTimeline: external.NewRiotClient(cfg.RiotTimelineApiKey, cfg.RiotRatePerSec, cfg.RiotRatePer2Min),
+		ddragon:      external.NewDDragonClient(),
 	}, nil
 }

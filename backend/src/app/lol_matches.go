@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"backend/src/db"
@@ -68,6 +70,7 @@ type MatchParticipant struct {
 	Team                 int16                  `json:"team"`
 	IsWin                bool                   `json:"isWin"`
 	PlayerId             string                 `json:"playerId"`
+	ParticipantId        int16                  `json:"participantId"`
 	Name                 string                 `json:"name"`
 	Tag                  string                 `json:"tag"`
 	RankPower            shared.Nullable[int32] `json:"rankPower"`
@@ -98,6 +101,9 @@ type MatchParticipant struct {
 	TrueDmgDealt         int32                  `json:"trueDmgDealt"`
 	DmgToTurrets         int32                  `json:"dmgToTurrets"`
 	DmgTaken             int32                  `json:"dmgTaken"`
+	DmgTakenPerMin       float32                `json:"dmgTakenPerMin"`
+	CrowdControl         int32                  `json:"crowdControl"`
+	CcPerMin             float32                `json:"ccPerMin"`
 	Heal                 int32                  `json:"heal"`
 	HealOthers           int32                  `json:"healOthers"`
 	ShieldOthers         int32                  `json:"shieldOthers"`
@@ -113,6 +119,10 @@ type MatchParticipant struct {
 	Runes                []int32                `json:"runes"`
 	StatRunes            []int32                `json:"statRunes"`
 	Items                []int32                `json:"items"`
+	StarterSets          []int32                `json:"starterSets"`
+	SkillsLeveled        []int32                `json:"skillsLeveled"`
+	FirstLegendItem      int32                  `json:"firstLegendItem"` // 0 = chưa xong đồ legendary nào
+	LegendItemsPurchased []int32                `json:"legendItemsPurchased"`
 }
 
 func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
@@ -121,6 +131,7 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		Team:                 p.Team,
 		IsWin:                p.IsWin,
 		PlayerId:             p.PlayerID,
+		ParticipantId:        p.ParticipantID,
 		Name:                 p.Name,
 		Tag:                  p.Tag,
 		RankPower:            shared.NullableInt4(p.RankPower),
@@ -151,6 +162,9 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		TrueDmgDealt:         p.TrueDmgDealt,
 		DmgToTurrets:         p.DmgToTurrets,
 		DmgTaken:             p.DmgTaken,
+		DmgTakenPerMin:       p.DmgTakenPerMin,
+		CrowdControl:         p.CrowdControl,
+		CcPerMin:             p.CcPerMin,
 		Heal:                 p.Heal,
 		HealOthers:           p.HealOthers,
 		ShieldOthers:         p.ShieldOthers,
@@ -166,6 +180,10 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		Runes:                p.Runes,
 		StatRunes:            p.StatRunes,
 		Items:                p.Items,
+		StarterSets:          p.StarterSets,
+		SkillsLeveled:        p.SkillsLeveled,
+		FirstLegendItem:      p.FirstLegendItem,
+		LegendItemsPurchased: p.LegendItemsPurchased,
 	}
 }
 
@@ -174,9 +192,10 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 // Map MatchDto của Riot rồi lưu: 1 query lấy rank của mọi participant (rank_power / estimated_rank
 // lấy từ solo rank của các participant đã có trong lol_players), insert tất cả match + participants
 // bằng pgx batch trong 1 transaction, rồi đọc lại 1 lần. Match đã có thì không ghi đè (DO NOTHING).
+// timelines: match id => timeline (từ fetchTimelinesOf); không có key => cột timeline của participant rỗng / 0.
 // 1 match lỗi => không match nào được lưu.
 // Kết quả theo game_start_at giảm dần.
-func (a *Application) SaveMatchesToDb(ctx context.Context, matches []*external.MatchDto) ([]Match, error) {
+func (a *Application) SaveMatchesToDb(ctx context.Context, matches []*external.MatchDto, timelines map[string]*external.MatchTimelineDto) ([]Match, error) {
 	if len(matches) == 0 {
 		return []Match{}, nil
 	}
@@ -189,12 +208,20 @@ func (a *Application) SaveMatchesToDb(ctx context.Context, matches []*external.M
 	if err != nil {
 		return nil, err
 	}
+	// Tách đồ legendary / trinket từ timeline cần loại item.
+	itemTypes := map[int32]ItemType{}
+	if len(timelines) > 0 {
+		itemTypes, err = a.itemTypesById(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	ids := make([]string, 0, len(matches))
 	matchParams := make([]db.InsertMatchesParams, 0, len(matches))
 	participantParams := []db.InsertMatchParticipantsParams{}
 	for _, m := range matches {
-		mp, pps := insertParamsOf(m, rankPowers)
+		mp, pps := insertParamsOf(m, timelines[m.Metadata.MatchId], rankPowers, itemTypes)
 		ids = append(ids, mp.ID)
 		matchParams = append(matchParams, mp)
 		participantParams = append(participantParams, pps...)
@@ -244,7 +271,8 @@ func (a *Application) GetMatchesByPlayerInfo(ctx context.Context, server Server,
 
 // Lấy list match id của player từ Riot (start = offset, count = số match; 0 => Riot default 20, tối đa 100);
 // match đã có trong DB thì đọc DB,
-// còn lại gọi Riot (GetMatchesByIds, song song theo batch) rồi lưu tất cả 1 lần bằng SaveMatchesToDb.
+// còn lại gọi Riot (FetchMatchesByIdsInParallel, song song theo batch) cùng lúc với timeline,
+// rồi lưu tất cả 1 lần bằng SaveMatchesToDb.
 // mode: NULL = mọi mode; chỉ nhận SOLO | FLEX (lọc theo queue của Riot), mode khác => err.
 // Kết quả theo thứ tự Riot trả về (mới nhất trước).
 func (a *Application) GetMatchesByPuuid(ctx context.Context, server Server, puuid string, mode shared.Nullable[GameMode], start, count int) ([]Match, error) {
@@ -261,7 +289,7 @@ func (a *Application) GetMatchesByPuuid(ctx context.Context, server Server, puui
 		opts.Queue = &queue
 	}
 
-	matchIds, err := a.riot.GetMatchIdsByPuuid(ctx, routing.matchRegion, puuid, opts)
+	matchIds, err := a.riot.FetchMatchIdsByPuuid(ctx, routing.matchRegion, puuid, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -281,14 +309,25 @@ func (a *Application) GetMatchesByPuuid(ctx context.Context, server Server, puui
 			missingIds = append(missingIds, id)
 		}
 	}
-	// Đợt 1: chỉ gọi Riot.
-	dtos, err := a.riot.GetMatchesByIdsInParallel(ctx, routing.matchRegion, missingIds)
+	// Đợt 1: chỉ gọi Riot. Match và timeline dùng 2 key (2 rate limiter riêng) nên fetch song song.
+	var dtos []*external.MatchDto
+	var timelines map[string]*external.MatchTimelineDto
+	var matchesErr, timelinesErr error
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		dtos, matchesErr = a.riot.FetchMatchesByIdsInParallel(ctx, routing.matchRegion, missingIds)
+	})
+	wg.Go(func() {
+		timelines, timelinesErr = a.fetchTimelinesOf(ctx, routing.matchRegion, missingIds)
+	})
+	wg.Wait()
+	err = errors.Join(matchesErr, timelinesErr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Đợt 2: lưu tất cả trong 1 lần.
-	saved, err := a.SaveMatchesToDb(ctx, dtos)
+	saved, err := a.SaveMatchesToDb(ctx, dtos, timelines)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +382,8 @@ func (a *Application) rankPowersOf(ctx context.Context, puuids []string) (map[st
 }
 
 // Map MatchDto thành params insert match + participants. rankPowers từ rankPowersOf.
-func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nullable[int32]) (db.InsertMatchesParams, []db.InsertMatchParticipantsParams) {
+// timeline nil (Riot 404) => cột timeline của participant rỗng / 0.
+func insertParamsOf(match *external.MatchDto, timeline *external.MatchTimelineDto, rankPowers map[string]shared.Nullable[int32], itemTypes map[int32]ItemType) (db.InsertMatchesParams, []db.InsertMatchParticipantsParams) {
 	info := match.Info
 	// Riot trả platform id ("VN2"), DB lưu enum Server của app ("VN"). Platform lạ (Riot mở server
 	// mới) thì giữ nguyên giá trị Riot để không mất dữ liệu, dù nó không khớp enum nào.
@@ -386,6 +426,8 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 		}
 	}
 
+	builds := timelineBuildsOf(timeline, itemTypes)
+
 	participantParams := make([]db.InsertMatchParticipantsParams, 0, len(info.Participants))
 	knownRankPowers := []int32{}
 	for _, p := range info.Participants {
@@ -399,7 +441,11 @@ func insertParamsOf(match *external.MatchDto, rankPowers map[string]shared.Nulla
 		if !rankPower.IsNull && rankPower.Value > 0 { // bỏ unknown và UNRANKED
 			knownRankPowers = append(knownRankPowers, rankPower.Value)
 		}
-		participantParams = append(participantParams, participantParamsOf(matchParams.ID, p, rankPower, teamKills[p.TeamId], matchParams.DurationSec, laneOpponentGoldOf(p, info.Participants)))
+		build, ok := builds[p.ParticipantId]
+		if !ok {
+			build = emptyTimelineBuild()
+		}
+		participantParams = append(participantParams, participantParamsOf(matchParams.ID, p, rankPower, teamKills[p.TeamId], matchParams.DurationSec, laneOpponentGoldOf(p, info.Participants), build))
 	}
 	matchParams.EstimatedRank = string(estimatedRankOf(knownRankPowers))
 	return matchParams, participantParams
@@ -416,7 +462,7 @@ func execBatch(exec func(func(int, error))) error {
 	return firstErr
 }
 
-func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int, durationSec int32, laneOpponentGold shared.Nullable[int]) db.InsertMatchParticipantsParams {
+func participantParamsOf(matchId string, p external.ParticipantDto, rankPower shared.Nullable[int32], teamKills int, durationSec int32, laneOpponentGold shared.Nullable[int], build timelineBuild) db.InsertMatchParticipantsParams {
 	var primary, sub external.PerkStyleDto
 	for _, s := range p.Perks.Styles {
 		switch s.Description {
@@ -457,11 +503,17 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 
 	cs := p.TotalMinionsKilled + p.NeutralMinionsKilled
 
+	var firstLegendItem int32
+	if len(build.LegendItemsPurchased) > 0 {
+		firstLegendItem = build.LegendItemsPurchased[0]
+	}
+
 	return db.InsertMatchParticipantsParams{
 		MatchID:              matchId,
 		Team:                 teamOf(p.TeamId),
 		IsWin:                p.Win,
 		PlayerID:             p.Puuid,
+		ParticipantID:        int16(p.ParticipantId),
 		Name:                 p.RiotIdGameName,
 		Tag:                  p.RiotIdTagline,
 		RankPower:            shared.PgInt4(rankPower),
@@ -492,6 +544,9 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		TrueDmgDealt:         int32(p.TrueDamageDealtToChampions),
 		DmgToTurrets:         int32(p.DamageDealtToTurrets),
 		DmgTaken:             int32(p.TotalDamageTaken),
+		DmgTakenPerMin:       perMinuteOf(p.TotalDamageTaken, durationSec),
+		CrowdControl:         int32(p.TimeCCingOthers),
+		CcPerMin:             perMinuteOf(p.TimeCCingOthers, durationSec),
 		Heal:                 int32(p.TotalHeal),
 		HealOthers:           int32(p.TotalHealsOnTeammates),
 		ShieldOthers:         int32(p.TotalDamageShieldedOnTeammates),
@@ -508,6 +563,12 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		Runes:            runes,
 		StatRunes:        []int32{int32(p.Perks.StatPerks.Offense), int32(p.Perks.StatPerks.Flex), int32(p.Perks.StatPerks.Defense)},
 		Items:            []int32{int32(p.Item0), int32(p.Item1), int32(p.Item2), int32(p.Item3), int32(p.Item4), int32(p.Item5), int32(p.Item6)},
+
+		// Từ timeline.
+		StarterSets:          build.StarterSets,
+		SkillsLeveled:        build.SkillsLeveled,
+		FirstLegendItem:      firstLegendItem,
+		LegendItemsPurchased: build.LegendItemsPurchased,
 	}
 }
 

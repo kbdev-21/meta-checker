@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const crawlFreq = 30 * time.Second
+const crawlFreq = 20 * time.Second
 const crawlBatch = 10
 const crawlMatchesPerPlayer = 10
 
@@ -91,7 +91,7 @@ func (a *Application) resetCrawlPuuids(ctx context.Context, crawler *Crawler) er
 
 	go func() {
 		defer wg.Done()
-		entries, err := a.riot.GetChallengerLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
+		entries, err := a.riot.FetchChallengerLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
 		if err != nil {
 			return
 		}
@@ -102,7 +102,7 @@ func (a *Application) resetCrawlPuuids(ctx context.Context, crawler *Crawler) er
 
 	go func() {
 		defer wg.Done()
-		entries, err := a.riot.GetGrandmasterLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
+		entries, err := a.riot.FetchGrandmasterLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
 		if err != nil {
 			return
 		}
@@ -113,7 +113,7 @@ func (a *Application) resetCrawlPuuids(ctx context.Context, crawler *Crawler) er
 
 	go func() {
 		defer wg.Done()
-		entries, err := a.riot.GetMasterLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
+		entries, err := a.riot.FetchMasterLeague(ctx, serverRiotRoutings[crawler.Server].platform, "RANKED_SOLO_5x5")
 		if err != nil {
 			return
 		}

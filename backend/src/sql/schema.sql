@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     team                   SMALLINT  NOT NULL,         -- 1 = blue (Riot 100) | 2 = red (Riot 200)
     is_win                 BOOLEAN   NOT NULL,
     player_id              TEXT      NOT NULL,         -- puuid; KHÔNG FK tới lol_players vì không phải ai cũng được crawl
+    participant_id         SMALLINT  NOT NULL,         -- participantId 1..10 của Riot; timeline (key khác => puuid khác) map qua cột này
 
     name                   TEXT      NOT NULL,         -- snapshot Riot ID lúc chơi
     tag                    TEXT      NOT NULL,
@@ -149,6 +150,9 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     true_dmg_dealt         INTEGER   NOT NULL,         -- trueDamageDealtToChampions
     dmg_to_turrets         INTEGER   NOT NULL,         -- damageDealtToTurrets
     dmg_taken              INTEGER   NOT NULL,         -- totalDamageTaken
+    dmg_taken_per_min      REAL      NOT NULL,         -- dmg_taken / phút, tính trong app
+    crowd_control          INTEGER   NOT NULL,         -- timeCCingOthers: điểm CC có trọng số (giống op.gg)
+    cc_per_min             REAL      NOT NULL,         -- crowd_control / phút, tính trong app
     heal                   INTEGER   NOT NULL,         -- totalHeal, gồm cả tự hồi (lifesteal, hồi máu, bình máu)
     heal_others            INTEGER   NOT NULL,         -- totalHealsOnTeammates, chỉ phần hồi cho đồng đội
     shield_others          INTEGER   NOT NULL,         -- totalDamageShieldedOnTeammates
@@ -169,6 +173,12 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     stat_runes             INTEGER[] NOT NULL,         -- [offense, flex, defense]
 
     items                  INTEGER[] NOT NULL,         -- đủ 7 phần tử item0..item6, giữ 0 cho slot rỗng; phần tử thứ 7 = trinket
+
+    -- Từ timeline, lưu cùng lúc với match. Riot không có timeline (404) => mảng rỗng / 0.
+    starter_sets           INTEGER[] NOT NULL DEFAULT '{}', -- item mua trong 60s đầu, bỏ trinket, giữ trùng, sort tăng dần
+    skills_leveled         INTEGER[] NOT NULL DEFAULT '{}', -- skillSlot theo thứ tự lên: 1 = Q, 2 = W, 3 = E, 4 = R
+    first_legend_item      INTEGER   NOT NULL DEFAULT 0,    -- = legend_items_purchased[1]; 0 = chưa xong đồ legendary nào (như slot rỗng của items)
+    legend_items_purchased INTEGER[] NOT NULL DEFAULT '{}', -- đồ LEGENDARY theo thứ tự mua, bỏ lượt undo, mua lại chỉ giữ lần đầu
 
     PRIMARY KEY (match_id, player_id)
 );
@@ -215,6 +225,8 @@ CREATE TABLE IF NOT EXISTS lol_champion_stats (
     avg_cs_per_min       DOUBLE PRECISION NOT NULL,
     avg_gold_per_min     DOUBLE PRECISION NOT NULL,
     avg_dmg_per_min      DOUBLE PRECISION NOT NULL,
+    avg_dmg_taken_per_min DOUBLE PRECISION NOT NULL,
+    avg_cc_per_min       DOUBLE PRECISION NOT NULL,
     avg_physical_dmg     DOUBLE PRECISION NOT NULL,
     avg_magic_dmg        DOUBLE PRECISION NOT NULL,
     avg_true_dmg         DOUBLE PRECISION NOT NULL,
@@ -228,12 +240,21 @@ CREATE TABLE IF NOT EXISTS lol_champion_stats (
     -- best_runes:           [{"runePrimaryStyle":Int,"runeSubStyle":Int,"keyRune":Int,"runes":[Int],"statRunes":[Int],"games":Int,"wins":Int}]
     -- best_legendary_items: [{"itemId":Int,"games":Int,"wins":Int}]  -- lol_items.type = LEGENDARY
     -- best_boot_items:      [{"itemId":Int,"games":Int,"wins":Int}]  -- lol_items.type = BOOTS
-    -- matchups:             [{"opponentChampionId":Int,"games":Int,"wins":Int}]  -- đối đầu cùng lane, khác phe
-    best_spell_combos    JSONB NOT NULL DEFAULT '[]',
-    best_runes           JSONB NOT NULL DEFAULT '[]',
-    best_legendary_items JSONB NOT NULL DEFAULT '[]',
-    best_boot_items      JSONB NOT NULL DEFAULT '[]',
-    matchups             JSONB NOT NULL DEFAULT '[]',
+    -- best_match_ups:       [{"opponentChampionId":Int,"games":Int,"wins":Int}]  -- đối đầu cùng lane, khác phe
+    -- Từ timeline, chỉ tính participant có dữ liệu tương ứng (mảng rỗng / 0 => bỏ qua):
+    -- best_starter_sets:       [{"itemIds":[Int],"games":Int,"wins":Int}]  -- starter_sets khác rỗng
+    -- best_skills_leveled:     [{"skills":[Int],"games":Int,"wins":Int}]   -- 13 lần lên skill đầu, chỉ participant có >= 13
+    -- best_first_legend_items: [{"itemId":Int,"games":Int,"wins":Int}]     -- first_legend_item khác 0
+    -- best_first_three_items:  [{"itemIds":[Int],"games":Int,"wins":Int}]  -- 3 đồ legendary đầu, GIỮ thứ tự mua
+    best_spell_combos       JSONB NOT NULL DEFAULT '[]',
+    best_runes              JSONB NOT NULL DEFAULT '[]',
+    best_legendary_items    JSONB NOT NULL DEFAULT '[]',
+    best_boot_items         JSONB NOT NULL DEFAULT '[]',
+    best_match_ups          JSONB NOT NULL DEFAULT '[]',
+    best_starter_sets       JSONB NOT NULL DEFAULT '[]',
+    best_skills_leveled     JSONB NOT NULL DEFAULT '[]',
+    best_first_legend_items JSONB NOT NULL DEFAULT '[]',
+    best_first_three_items  JSONB NOT NULL DEFAULT '[]',
 
     PRIMARY KEY (meta_id, position, champion_id)
 );

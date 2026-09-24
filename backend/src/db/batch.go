@@ -19,24 +19,26 @@ var (
 
 const insertMatchParticipants = `-- name: InsertMatchParticipants :batchexec
 INSERT INTO lol_match_participants (
-    match_id, team, is_win, player_id,
+    match_id, team, is_win, player_id, participant_id,
     name, tag, rank_power,
     champion_id, champion_slug, champ_level, position,
     kills, deaths, assists, kda, kill_participation,
     double_kills, triple_kills, quadra_kills, penta_kills, solo_kills,
     gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min,
     dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets,
-    dmg_taken, heal, heal_others, shield_others,
+    dmg_taken, dmg_taken_per_min, crowd_control, cc_per_min,
+    heal, heal_others, shield_others,
     vision_score, wards_placed, wards_killed,
     perf_score,
     spell1_id, spell2_id,
     rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
-    items
+    items,
+    starter_sets, skills_leveled, first_legend_item, legend_items_purchased
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
     $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
-    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49
+    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57
 )
 ON CONFLICT (match_id, player_id) DO NOTHING
 `
@@ -52,6 +54,7 @@ type InsertMatchParticipantsParams struct {
 	Team                 int16       `json:"team"`
 	IsWin                bool        `json:"isWin"`
 	PlayerID             string      `json:"playerId"`
+	ParticipantID        int16       `json:"participantId"`
 	Name                 string      `json:"name"`
 	Tag                  string      `json:"tag"`
 	RankPower            pgtype.Int4 `json:"rankPower"`
@@ -82,6 +85,9 @@ type InsertMatchParticipantsParams struct {
 	TrueDmgDealt         int32       `json:"trueDmgDealt"`
 	DmgToTurrets         int32       `json:"dmgToTurrets"`
 	DmgTaken             int32       `json:"dmgTaken"`
+	DmgTakenPerMin       float32     `json:"dmgTakenPerMin"`
+	CrowdControl         int32       `json:"crowdControl"`
+	CcPerMin             float32     `json:"ccPerMin"`
 	Heal                 int32       `json:"heal"`
 	HealOthers           int32       `json:"healOthers"`
 	ShieldOthers         int32       `json:"shieldOthers"`
@@ -97,6 +103,10 @@ type InsertMatchParticipantsParams struct {
 	Runes                []int32     `json:"runes"`
 	StatRunes            []int32     `json:"statRunes"`
 	Items                []int32     `json:"items"`
+	StarterSets          []int32     `json:"starterSets"`
+	SkillsLeveled        []int32     `json:"skillsLeveled"`
+	FirstLegendItem      int32       `json:"firstLegendItem"`
+	LegendItemsPurchased []int32     `json:"legendItemsPurchased"`
 }
 
 // Batch, trùng (match_id, player_id) thì bỏ qua.
@@ -108,6 +118,7 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.Team,
 			a.IsWin,
 			a.PlayerID,
+			a.ParticipantID,
 			a.Name,
 			a.Tag,
 			a.RankPower,
@@ -138,6 +149,9 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.TrueDmgDealt,
 			a.DmgToTurrets,
 			a.DmgTaken,
+			a.DmgTakenPerMin,
+			a.CrowdControl,
+			a.CcPerMin,
 			a.Heal,
 			a.HealOthers,
 			a.ShieldOthers,
@@ -153,6 +167,10 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.Runes,
 			a.StatRunes,
 			a.Items,
+			a.StarterSets,
+			a.SkillsLeveled,
+			a.FirstLegendItem,
+			a.LegendItemsPurchased,
 		}
 		batch.Queue(insertMatchParticipants, vals...)
 	}

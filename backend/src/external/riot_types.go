@@ -153,6 +153,7 @@ type ParticipantDto struct {
 	VisionScore                    int `json:"visionScore"`
 	WardsPlaced                    int `json:"wardsPlaced"`
 	WardsKilled                    int `json:"wardsKilled"`
+	TimeCCingOthers                int `json:"timeCCingOthers"` // điểm CC có trọng số, op.gg dùng số này
 
 	GameEndedInEarlySurrender bool `json:"gameEndedInEarlySurrender"` // remake
 
@@ -224,4 +225,33 @@ type ObjectivesDto struct {
 type ObjectiveDto struct {
 	First bool `json:"first"`
 	Kills int  `json:"kills"`
+}
+
+// ---------- match-v5: timeline ----------
+
+// Chỉ decode phần cần dùng. Puuid trong timeline bị mã hóa theo key gọi nó nên KHÔNG đọc:
+// người chơi luôn map qua participantId (1..10), khớp ParticipantDto.ParticipantId.
+type MatchTimelineDto struct {
+	Info MatchTimelineInfoDto `json:"info"`
+}
+
+type MatchTimelineInfoDto struct {
+	Frames []TimelineFrameDto `json:"frames"`
+}
+
+type TimelineFrameDto struct {
+	Timestamp int64              `json:"timestamp"`
+	Events    []TimelineEventDto `json:"events"`
+}
+
+// Gộp field của mọi loại event cần dùng; event nào không có field thì để zero value.
+type TimelineEventDto struct {
+	Type          string `json:"type"`      // ITEM_PURCHASED | ITEM_UNDO | SKILL_LEVEL_UP | ...
+	Timestamp     int64  `json:"timestamp"` // ms tính từ đầu trận
+	ParticipantId int    `json:"participantId"`
+	ItemId        int    `json:"itemId"`      // ITEM_PURCHASED | ITEM_SOLD | ITEM_DESTROYED
+	BeforeId      int    `json:"beforeId"`    // ITEM_UNDO: item bị hoàn tác (0 = hoàn tác lượt bán)
+	AfterId       int    `json:"afterId"`     // ITEM_UNDO
+	SkillSlot     int    `json:"skillSlot"`   // SKILL_LEVEL_UP: 1 = Q, 2 = W, 3 = E, 4 = R
+	LevelUpType   string `json:"levelUpType"` // SKILL_LEVEL_UP: NORMAL | EVOLVE
 }

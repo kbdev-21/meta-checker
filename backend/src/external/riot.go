@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Số match gọi song song mỗi lượt trong GetMatchesByIdsInParallel. Việc giữ nhịp rate limit do
+// Số match gọi song song mỗi lượt trong FetchMatchesByIdsInParallel. Việc giữ nhịp rate limit do
 // riotRateLimiter lo, hằng này chỉ còn giới hạn số goroutine cùng chờ.
 const matchFetchBatchSize = 10
 
@@ -111,20 +111,20 @@ func retryAfterOf(res *http.Response) time.Duration {
 
 // ---------- account-v1 ----------
 
-func (c *RiotClient) GetAccountByRiotId(ctx context.Context, region, gameName, tagLine string) (*AccountDto, error) {
+func (c *RiotClient) FetchAccountByRiotId(ctx context.Context, region, gameName, tagLine string) (*AccountDto, error) {
 	var out AccountDto
 	path := "/riot/account/v1/accounts/by-riot-id/" + url.PathEscape(gameName) + "/" + url.PathEscape(tagLine)
 	return &out, c.get(ctx, region, path, nil, &out)
 }
 
-func (c *RiotClient) GetAccountByPuuid(ctx context.Context, region, puuid string) (*AccountDto, error) {
+func (c *RiotClient) FetchAccountByPuuid(ctx context.Context, region, puuid string) (*AccountDto, error) {
 	var out AccountDto
 	return &out, c.get(ctx, region, "/riot/account/v1/accounts/by-puuid/"+puuid, nil, &out)
 }
 
 // ---------- league-v4 ----------
 
-func (c *RiotClient) GetLeagueEntriesByPuuid(ctx context.Context, platform, puuid string) ([]LeagueEntryDto, error) {
+func (c *RiotClient) FetchLeagueEntriesByPuuid(ctx context.Context, platform, puuid string) ([]LeagueEntryDto, error) {
 	var out []LeagueEntryDto
 	err := c.get(ctx, platform, "/lol/league/v4/entries/by-puuid/"+puuid, nil, &out)
 	if err != nil {
@@ -133,24 +133,24 @@ func (c *RiotClient) GetLeagueEntriesByPuuid(ctx context.Context, platform, puui
 	return out, nil
 }
 
-func (c *RiotClient) GetChallengerLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
+func (c *RiotClient) FetchChallengerLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
 	var out LeagueListDto
 	return &out, c.get(ctx, platform, "/lol/league/v4/challengerleagues/by-queue/"+string(queue), nil, &out)
 }
 
-func (c *RiotClient) GetGrandmasterLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
+func (c *RiotClient) FetchGrandmasterLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
 	var out LeagueListDto
 	return &out, c.get(ctx, platform, "/lol/league/v4/grandmasterleagues/by-queue/"+string(queue), nil, &out)
 }
 
-func (c *RiotClient) GetMasterLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
+func (c *RiotClient) FetchMasterLeague(ctx context.Context, platform string, queue QueueType) (*LeagueListDto, error) {
 	var out LeagueListDto
 	return &out, c.get(ctx, platform, "/lol/league/v4/masterleagues/by-queue/"+string(queue), nil, &out)
 }
 
 // ---------- match-v5 ----------
 
-func (c *RiotClient) GetMatchIdsByPuuid(ctx context.Context, region, puuid string, opts MatchIdsOptions) ([]string, error) {
+func (c *RiotClient) FetchMatchIdsByPuuid(ctx context.Context, region, puuid string, opts MatchIdsOptions) ([]string, error) {
 	q := url.Values{}
 	if opts.StartTime > 0 {
 		q.Set("startTime", strconv.FormatInt(opts.StartTime, 10))
@@ -179,14 +179,20 @@ func (c *RiotClient) GetMatchIdsByPuuid(ctx context.Context, region, puuid strin
 	return out, nil
 }
 
-func (c *RiotClient) GetMatch(ctx context.Context, region, matchId string) (*MatchDto, error) {
+func (c *RiotClient) FetchMatch(ctx context.Context, region, matchId string) (*MatchDto, error) {
 	var out MatchDto
 	return &out, c.get(ctx, region, "/lol/match/v5/matches/"+matchId, nil, &out)
 }
 
-// Gọi GetMatch cho từng id, mỗi lượt matchFetchBatchSize goroutine song song.
+// Riot không có timeline của trận => 404 (IsRiotNotFound).
+func (c *RiotClient) FetchMatchTimeline(ctx context.Context, region, matchId string) (*MatchTimelineDto, error) {
+	var out MatchTimelineDto
+	return &out, c.get(ctx, region, "/lol/match/v5/matches/"+matchId+"/timeline", nil, &out)
+}
+
+// Gọi FetchMatch cho từng id, mỗi lượt matchFetchBatchSize goroutine song song.
 // Kết quả theo thứ tự matchIds. Có match lỗi => trả lỗi, bỏ cả kết quả.
-func (c *RiotClient) GetMatchesByIdsInParallel(ctx context.Context, region string, matchIds []string) ([]*MatchDto, error) {
+func (c *RiotClient) FetchMatchesByIdsInParallel(ctx context.Context, region string, matchIds []string) ([]*MatchDto, error) {
 	out := make([]*MatchDto, 0, len(matchIds))
 	for start := 0; start < len(matchIds); start += matchFetchBatchSize {
 		batch := matchIds[start:min(start+matchFetchBatchSize, len(matchIds))]
@@ -195,7 +201,36 @@ func (c *RiotClient) GetMatchesByIdsInParallel(ctx context.Context, region strin
 		var wg sync.WaitGroup
 		for i, id := range batch {
 			wg.Go(func() {
-				fetched[i], errs[i] = c.GetMatch(ctx, region, id)
+				fetched[i], errs[i] = c.FetchMatch(ctx, region, id)
+			})
+		}
+		wg.Wait()
+		err := errors.Join(errs...)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, fetched...)
+	}
+	return out, nil
+}
+
+// Gọi FetchMatchTimeline cho từng id, mỗi lượt matchFetchBatchSize goroutine song song.
+// Kết quả theo thứ tự matchIds; Riot 404 (không có timeline) => phần tử nil, không tính là lỗi.
+// Lỗi khác => trả lỗi, bỏ cả kết quả.
+func (c *RiotClient) FetchMatchTimelinesByIdsInParallel(ctx context.Context, region string, matchIds []string) ([]*MatchTimelineDto, error) {
+	out := make([]*MatchTimelineDto, 0, len(matchIds))
+	for start := 0; start < len(matchIds); start += matchFetchBatchSize {
+		batch := matchIds[start:min(start+matchFetchBatchSize, len(matchIds))]
+		fetched := make([]*MatchTimelineDto, len(batch))
+		errs := make([]error, len(batch))
+		var wg sync.WaitGroup
+		for i, id := range batch {
+			wg.Go(func() {
+				timeline, err := c.FetchMatchTimeline(ctx, region, id)
+				if IsRiotNotFound(err) {
+					return
+				}
+				fetched[i], errs[i] = timeline, err
 			})
 		}
 		wg.Wait()
@@ -210,7 +245,7 @@ func (c *RiotClient) GetMatchesByIdsInParallel(ctx context.Context, region strin
 
 // ---------- summoner-v4 ----------
 
-func (c *RiotClient) GetSummonerByPuuid(ctx context.Context, platform, puuid string) (*SummonerDto, error) {
+func (c *RiotClient) FetchSummonerByPuuid(ctx context.Context, platform, puuid string) (*SummonerDto, error) {
 	var out SummonerDto
 	return &out, c.get(ctx, platform, "/lol/summoner/v4/summoners/by-puuid/"+puuid, nil, &out)
 }

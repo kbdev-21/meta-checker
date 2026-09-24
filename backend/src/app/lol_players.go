@@ -137,7 +137,7 @@ func (a *Application) UpdatePlayerByPlayerInfo(ctx context.Context, server Serve
 		return Player{}, fmt.Errorf("invalid server: %q", server)
 	}
 
-	account, err := a.riot.GetAccountByRiotId(ctx, server.riot().accountRegion, name, tag)
+	account, err := a.riot.FetchAccountByRiotId(ctx, server.riot().accountRegion, name, tag)
 	if err != nil {
 		return Player{}, err
 	}
@@ -151,7 +151,7 @@ func (a *Application) UpdatePlayerByPuuid(ctx context.Context, server Server, pu
 		return Player{}, fmt.Errorf("invalid server: %q", server)
 	}
 
-	account, err := a.riot.GetAccountByPuuid(ctx, server.riot().accountRegion, puuid)
+	account, err := a.riot.FetchAccountByPuuid(ctx, server.riot().accountRegion, puuid)
 	if err != nil {
 		return Player{}, err
 	}
@@ -173,10 +173,10 @@ func (a *Application) updatePlayerFromAccount(ctx context.Context, server Server
 		wg          sync.WaitGroup
 	)
 	wg.Go(func() {
-		summoner, summonerErr = a.riot.GetSummonerByPuuid(ctx, routing.platform, account.Puuid)
+		summoner, summonerErr = a.riot.FetchSummonerByPuuid(ctx, routing.platform, account.Puuid)
 	})
 	wg.Go(func() {
-		entries, entriesErr = a.riot.GetLeagueEntriesByPuuid(ctx, routing.platform, account.Puuid)
+		entries, entriesErr = a.riot.FetchLeagueEntriesByPuuid(ctx, routing.platform, account.Puuid)
 	})
 	wg.Wait()
 	err := errors.Join(summonerErr, entriesErr)

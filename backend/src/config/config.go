@@ -17,6 +17,7 @@ type Config struct {
 	Port                  string
 	PostgresConnectionUrl string
 	RiotApiKey            string
+	RiotTimelineApiKey    string // key thứ 2, chỉ dùng fetch match timeline
 	RiotRatePerSec        int
 	RiotRatePer2Min       int
 }
@@ -34,6 +35,7 @@ func LoadConfig() Config {
 		Port:                  port,
 		PostgresConnectionUrl: os.Getenv("POSTGRES_CONNECTION_URL"),
 		RiotApiKey:            os.Getenv("RIOT_API_KEY"),
+		RiotTimelineApiKey:    os.Getenv("RIOT_TIMELINE_API_KEY"),
 		RiotRatePerSec:        intEnv("RIOT_RATE_PER_SEC", defaultRiotRatePerSec),
 		RiotRatePer2Min:       intEnv("RIOT_RATE_PER_2MIN", defaultRiotRatePer2Min),
 	}

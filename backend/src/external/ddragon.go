@@ -63,7 +63,7 @@ func DDRuneIconUrl(icon string) string {
 
 // Cache 1h. Giữ lock qua cả cú fetch: nhiều request cùng hết hạn một lúc thì chỉ 1 cái
 // đi gọi ddragon, số còn lại chờ rồi ăn cache mới.
-func (c *DDragonClient) GetCurrentVersion(ctx context.Context) (string, error) {
+func (c *DDragonClient) FetchCurrentVersion(ctx context.Context) (string, error) {
 	c.versionMu.Lock()
 	defer c.versionMu.Unlock()
 
@@ -90,7 +90,7 @@ func (c *DDragonClient) GetCurrentVersion(ctx context.Context) (string, error) {
 }
 
 // key = champion id dạng tên (vd "Aatrox"); DDChampion.Key = championId số trong match.
-func (c *DDragonClient) GetChampions(ctx context.Context, version, lang string) (map[string]DDChampion, error) {
+func (c *DDragonClient) FetchChampions(ctx context.Context, version, lang string) (map[string]DDChampion, error) {
 	var out ddResponse[DDChampion]
 	err := c.get(ctx, dataPath(version, lang, "champion.json"), &out)
 	if err != nil {
@@ -100,7 +100,7 @@ func (c *DDragonClient) GetChampions(ctx context.Context, version, lang string) 
 }
 
 // key = item id (vd "3031").
-func (c *DDragonClient) GetItems(ctx context.Context, version, lang string) (map[string]DDItem, error) {
+func (c *DDragonClient) FetchItems(ctx context.Context, version, lang string) (map[string]DDItem, error) {
 	var out ddResponse[DDItem]
 	err := c.get(ctx, dataPath(version, lang, "item.json"), &out)
 	if err != nil {
@@ -110,7 +110,7 @@ func (c *DDragonClient) GetItems(ctx context.Context, version, lang string) (map
 }
 
 // key = spell id dạng tên (vd "SummonerFlash"); DDSummonerSpell.Key = summoner1Id/2Id trong match.
-func (c *DDragonClient) GetSummonerSpells(ctx context.Context, version, lang string) (map[string]DDSummonerSpell, error) {
+func (c *DDragonClient) FetchSummonerSpells(ctx context.Context, version, lang string) (map[string]DDSummonerSpell, error) {
 	var out ddResponse[DDSummonerSpell]
 	err := c.get(ctx, dataPath(version, lang, "summoner.json"), &out)
 	if err != nil {
@@ -119,7 +119,7 @@ func (c *DDragonClient) GetSummonerSpells(ctx context.Context, version, lang str
 	return out.Data, nil
 }
 
-func (c *DDragonClient) GetRunes(ctx context.Context, version, lang string) ([]DDRuneTree, error) {
+func (c *DDragonClient) FetchRunes(ctx context.Context, version, lang string) ([]DDRuneTree, error) {
 	var out []DDRuneTree
 	err := c.get(ctx, dataPath(version, lang, "runesReforged.json"), &out)
 	if err != nil {

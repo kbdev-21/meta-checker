@@ -48,12 +48,17 @@ func IsValidMetaServer(server string) bool {
 
 // ---------- entity ----------
 
-// Các phần tử build lưu trong JSONB, mỗi phần tử kèm games/wins để đứng độc lập.
+// Số đếm chung của mọi phần tử build trong JSONB, để mỗi phần tử đứng độc lập.
+// Nhúng không kèm json tag nên key "games" / "wins" nằm phẳng cạnh các key còn lại.
+type GameStat struct {
+	Games int32 `json:"games"`
+	Wins  int32 `json:"wins"`
+}
+
 type SpellComboStat struct {
 	Spell1Id int32 `json:"spell1Id"`
 	Spell2Id int32 `json:"spell2Id"`
-	Games    int32 `json:"games"`
-	Wins     int32 `json:"wins"`
+	GameStat
 }
 
 type RuneStat struct {
@@ -62,24 +67,33 @@ type RuneStat struct {
 	KeyRune          int32   `json:"keyRune"`
 	Runes            []int32 `json:"runes"`
 	StatRunes        []int32 `json:"statRunes"`
-	Games            int32   `json:"games"`
-	Wins             int32   `json:"wins"`
+	GameStat
 }
 
 type ItemStat struct {
 	ItemId int32 `json:"itemId"`
-	Games  int32 `json:"games"`
-	Wins   int32 `json:"wins"`
+	GameStat
 }
 
 type MatchupStat struct {
 	OpponentChampionId int32 `json:"opponentChampionId"`
-	Games              int32 `json:"games"`
-	Wins               int32 `json:"wins"`
+	GameStat
+}
+
+// Một bộ item: starter set (đã sort) hoặc 3 đồ legendary đầu (giữ thứ tự mua).
+type ItemSetStat struct {
+	ItemIds []int32 `json:"itemIds"`
+	GameStat
+}
+
+// Thứ tự lên skill, mỗi phần tử là skillSlot: 1 = Q, 2 = W, 3 = E, 4 = R.
+type SkillOrderStat struct {
+	Skills []int32 `json:"skills"`
+	GameStat
 }
 
 // ChampionStatSummary nhúng luôn patch/server/rankBucket của meta để có thể đứng độc lập
-// (tách khỏi Meta vẫn biết mình thuộc lát cắt nào). Không kèm 4 nhóm build: tier list trả
+// (tách khỏi Meta vẫn biết mình thuộc lát cắt nào). Không kèm các nhóm build: tier list trả
 // hàng trăm dòng nên chúng sẽ chiếm ~85% payload.
 type ChampionStatSummary struct {
 	Patch      string     `json:"patch"`
@@ -99,33 +113,39 @@ type ChampionStatSummary struct {
 	TierScore int32        `json:"tierScore"` // tierScore + tier tính lúc đọc từ winRate + pickRate, không lưu DB
 	Tier      ChampionTier `json:"tier"`
 
-	AvgKills       float64 `json:"avgKills"`
-	AvgDeaths      float64 `json:"avgDeaths"`
-	AvgAssists     float64 `json:"avgAssists"`
-	AvgKda         float64 `json:"avgKda"`
-	AvgKp          float64 `json:"avgKp"`
-	AvgCsPerMin    float64 `json:"avgCsPerMin"`
-	AvgGoldPerMin  float64 `json:"avgGoldPerMin"`
-	AvgDmgPerMin   float64 `json:"avgDmgPerMin"`
-	AvgPhysicalDmg float64 `json:"avgPhysicalDmg"`
-	AvgMagicDmg    float64 `json:"avgMagicDmg"`
-	AvgTrueDmg     float64 `json:"avgTrueDmg"`
-	AvgPenta       float64 `json:"avgPenta"`
-	AvgSoloKills   float64 `json:"avgSoloKills"`
-	AvgPerfScore   float64 `json:"avgPerfScore"`
+	AvgKills          float64 `json:"avgKills"`
+	AvgDeaths         float64 `json:"avgDeaths"`
+	AvgAssists        float64 `json:"avgAssists"`
+	AvgKda            float64 `json:"avgKda"`
+	AvgKp             float64 `json:"avgKp"`
+	AvgCsPerMin       float64 `json:"avgCsPerMin"`
+	AvgGoldPerMin     float64 `json:"avgGoldPerMin"`
+	AvgDmgPerMin      float64 `json:"avgDmgPerMin"`
+	AvgDmgTakenPerMin float64 `json:"avgDmgTakenPerMin"`
+	AvgCcPerMin       float64 `json:"avgCcPerMin"`
+	AvgPhysicalDmg    float64 `json:"avgPhysicalDmg"`
+	AvgMagicDmg       float64 `json:"avgMagicDmg"`
+	AvgTrueDmg        float64 `json:"avgTrueDmg"`
+	AvgPenta          float64 `json:"avgPenta"`
+	AvgSoloKills      float64 `json:"avgSoloKills"`
+	AvgPerfScore      float64 `json:"avgPerfScore"`
 
-	Matchups []MatchupStat `json:"matchups"`
+	BestMatchUps []MatchupStat `json:"bestMatchUps"`
 }
 
 // ChampionStat = summary + build, cho endpoint đọc 1 tướng. Struct nhúng nên JSON vẫn
-// phẳng: key y hệt ChampionStatSummary cộng thêm 4 key build.
+// phẳng: key y hệt ChampionStatSummary cộng thêm các key build.
 type ChampionStat struct {
 	ChampionStatSummary
 
-	BestSpellCombos    []SpellComboStat `json:"bestSpellCombos"`
-	BestRunes          []RuneStat       `json:"bestRunes"`
-	BestLegendaryItems []ItemStat       `json:"bestLegendaryItems"`
-	BestBootItems      []ItemStat       `json:"bestBootItems"`
+	BestSpellCombos      []SpellComboStat `json:"bestSpellCombos"`
+	BestRunes            []RuneStat       `json:"bestRunes"`
+	BestLegendaryItems   []ItemStat       `json:"bestLegendaryItems"`
+	BestBootItems        []ItemStat       `json:"bestBootItems"`
+	BestStarterSets      []ItemSetStat    `json:"bestStarterSets"`
+	BestSkillsLeveled    []SkillOrderStat `json:"bestSkillsLeveled"`
+	BestFirstLegendItems []ItemStat       `json:"bestFirstLegendItems"`
+	BestFirstThreeItems  []ItemSetStat    `json:"bestFirstThreeItems"`
 }
 
 type Meta struct {
@@ -159,26 +179,28 @@ func ToChampionStatSummary(m db.LolMeta, r db.GetChampionStatsByMetaRow) Champio
 		TierScore: tierScore,
 		Tier:      championTierOf(tierScore),
 
-		AvgKills:       r.AvgKills,
-		AvgDeaths:      r.AvgDeaths,
-		AvgAssists:     r.AvgAssists,
-		AvgKda:         r.AvgKda,
-		AvgKp:          r.AvgKp,
-		AvgCsPerMin:    r.AvgCsPerMin,
-		AvgGoldPerMin:  r.AvgGoldPerMin,
-		AvgDmgPerMin:   r.AvgDmgPerMin,
-		AvgPhysicalDmg: r.AvgPhysicalDmg,
-		AvgMagicDmg:    r.AvgMagicDmg,
-		AvgTrueDmg:     r.AvgTrueDmg,
-		AvgPenta:       r.AvgPenta,
-		AvgSoloKills:   r.AvgSoloKills,
-		AvgPerfScore:   r.AvgPerfScore,
+		AvgKills:          r.AvgKills,
+		AvgDeaths:         r.AvgDeaths,
+		AvgAssists:        r.AvgAssists,
+		AvgKda:            r.AvgKda,
+		AvgKp:             r.AvgKp,
+		AvgCsPerMin:       r.AvgCsPerMin,
+		AvgGoldPerMin:     r.AvgGoldPerMin,
+		AvgDmgPerMin:      r.AvgDmgPerMin,
+		AvgDmgTakenPerMin: r.AvgDmgTakenPerMin,
+		AvgCcPerMin:       r.AvgCcPerMin,
+		AvgPhysicalDmg:    r.AvgPhysicalDmg,
+		AvgMagicDmg:       r.AvgMagicDmg,
+		AvgTrueDmg:        r.AvgTrueDmg,
+		AvgPenta:          r.AvgPenta,
+		AvgSoloKills:      r.AvgSoloKills,
+		AvgPerfScore:      r.AvgPerfScore,
 
-		Matchups: unmarshalBuild[MatchupStat](r.Matchups),
+		BestMatchUps: unmarshalBuild[MatchupStat](r.BestMatchUps),
 	}
 }
 
-// Row của query 1 tướng là type khác (có thêm 4 cột build) nên sqlc không dùng chung
+// Row của query 1 tướng là type khác (có thêm các cột build) nên sqlc không dùng chung
 // struct được; phần scalar vì vậy map lại ở đây, phải sửa kèm ToChampionStatSummary.
 func ToChampionStat(m db.LolMeta, r db.GetChampionStatsByMetaAndChampIdRow) ChampionStat {
 	tierScore := tierScoreOf(r.WinRate, r.PickRate)
@@ -202,28 +224,34 @@ func ToChampionStat(m db.LolMeta, r db.GetChampionStatsByMetaAndChampIdRow) Cham
 			TierScore: tierScore,
 			Tier:      championTierOf(tierScore),
 
-			AvgKills:       r.AvgKills,
-			AvgDeaths:      r.AvgDeaths,
-			AvgAssists:     r.AvgAssists,
-			AvgKda:         r.AvgKda,
-			AvgKp:          r.AvgKp,
-			AvgCsPerMin:    r.AvgCsPerMin,
-			AvgGoldPerMin:  r.AvgGoldPerMin,
-			AvgDmgPerMin:   r.AvgDmgPerMin,
-			AvgPhysicalDmg: r.AvgPhysicalDmg,
-			AvgMagicDmg:    r.AvgMagicDmg,
-			AvgTrueDmg:     r.AvgTrueDmg,
-			AvgPenta:       r.AvgPenta,
-			AvgSoloKills:   r.AvgSoloKills,
-			AvgPerfScore:   r.AvgPerfScore,
+			AvgKills:          r.AvgKills,
+			AvgDeaths:         r.AvgDeaths,
+			AvgAssists:        r.AvgAssists,
+			AvgKda:            r.AvgKda,
+			AvgKp:             r.AvgKp,
+			AvgCsPerMin:       r.AvgCsPerMin,
+			AvgGoldPerMin:     r.AvgGoldPerMin,
+			AvgDmgPerMin:      r.AvgDmgPerMin,
+			AvgDmgTakenPerMin: r.AvgDmgTakenPerMin,
+			AvgCcPerMin:       r.AvgCcPerMin,
+			AvgPhysicalDmg:    r.AvgPhysicalDmg,
+			AvgMagicDmg:       r.AvgMagicDmg,
+			AvgTrueDmg:        r.AvgTrueDmg,
+			AvgPenta:          r.AvgPenta,
+			AvgSoloKills:      r.AvgSoloKills,
+			AvgPerfScore:      r.AvgPerfScore,
 
-			Matchups: unmarshalBuild[MatchupStat](r.Matchups),
+			BestMatchUps: unmarshalBuild[MatchupStat](r.BestMatchUps),
 		},
 
-		BestSpellCombos:    unmarshalBuild[SpellComboStat](r.BestSpellCombos),
-		BestRunes:          unmarshalBuild[RuneStat](r.BestRunes),
-		BestLegendaryItems: unmarshalBuild[ItemStat](r.BestLegendaryItems),
-		BestBootItems:      unmarshalBuild[ItemStat](r.BestBootItems),
+		BestSpellCombos:      unmarshalBuild[SpellComboStat](r.BestSpellCombos),
+		BestRunes:            unmarshalBuild[RuneStat](r.BestRunes),
+		BestLegendaryItems:   unmarshalBuild[ItemStat](r.BestLegendaryItems),
+		BestBootItems:        unmarshalBuild[ItemStat](r.BestBootItems),
+		BestStarterSets:      unmarshalBuild[ItemSetStat](r.BestStarterSets),
+		BestSkillsLeveled:    unmarshalBuild[SkillOrderStat](r.BestSkillsLeveled),
+		BestFirstLegendItems: unmarshalBuild[ItemStat](r.BestFirstLegendItems),
+		BestFirstThreeItems:  unmarshalBuild[ItemSetStat](r.BestFirstThreeItems),
 	}
 }
 
@@ -260,7 +288,7 @@ const (
 
 // Tổng hợp lại toàn bộ meta cho patch hiện tại. Idempotent: xóa sạch children rồi dựng lại.
 func (a *Application) UpdateAnalytics(ctx context.Context) error {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return err
 	}
@@ -279,7 +307,7 @@ func (a *Application) UpdateAnalytics(ctx context.Context) error {
 
 // Trả meta của patch hiện tại kèm tất cả champion stat. Chưa tổng hợp lần nào => IsNull.
 func (a *Application) GetAnalytics(ctx context.Context, server string, bucket RankBucket) (shared.Nullable[Meta], error) {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return shared.Nullable[Meta]{}, err
 	}
@@ -307,7 +335,7 @@ func (a *Application) GetAnalytics(ctx context.Context, server string, bucket Ra
 // Trả mọi position của 1 champion trong lát cắt của patch hiện tại.
 // Chưa tổng hợp meta => IsNull; champion không có dòng nào => list rỗng.
 func (a *Application) GetChampionStats(ctx context.Context, server string, bucket RankBucket, championId int32) (shared.Nullable[[]ChampionStat], error) {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return shared.Nullable[[]ChampionStat]{}, err
 	}
@@ -406,6 +434,34 @@ func (a *Application) refreshMeta(ctx context.Context, patch, server string, buc
 		return err
 	}
 	err = q.RefreshChampionStatsMatchups(ctx, db.RefreshChampionStatsMatchupsParams{
+		MetaID: metaId, Patch: patch,
+		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+	})
+	if err != nil {
+		return err
+	}
+	err = q.RefreshChampionStatsStarterSets(ctx, db.RefreshChampionStatsStarterSetsParams{
+		MetaID: metaId, Patch: patch,
+		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+	})
+	if err != nil {
+		return err
+	}
+	err = q.RefreshChampionStatsSkillsLeveled(ctx, db.RefreshChampionStatsSkillsLeveledParams{
+		MetaID: metaId, Patch: patch,
+		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+	})
+	if err != nil {
+		return err
+	}
+	err = q.RefreshChampionStatsFirstLegendItems(ctx, db.RefreshChampionStatsFirstLegendItemsParams{
+		MetaID: metaId, Patch: patch,
+		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+	})
+	if err != nil {
+		return err
+	}
+	err = q.RefreshChampionStatsFirstThreeItems(ctx, db.RefreshChampionStatsFirstThreeItemsParams{
 		MetaID: metaId, Patch: patch,
 		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
 	})

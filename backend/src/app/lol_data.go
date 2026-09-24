@@ -170,11 +170,11 @@ func (a *Application) GetRunes(ctx context.Context) ([]Rune, error) {
 }
 
 func (a *Application) UpdateChampions(ctx context.Context) error {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return err
 	}
-	champs, err := a.ddragon.GetChampions(ctx, version, ddragonLang)
+	champs, err := a.ddragon.FetchChampions(ctx, version, ddragonLang)
 	if err != nil {
 		return err
 	}
@@ -208,11 +208,11 @@ func (a *Application) UpdateChampions(ctx context.Context) error {
 
 // Xem UpdateChampions về version vs patch.
 func (a *Application) UpdateItems(ctx context.Context) error {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return err
 	}
-	items, err := a.ddragon.GetItems(ctx, version, ddragonLang)
+	items, err := a.ddragon.FetchItems(ctx, version, ddragonLang)
 	if err != nil {
 		return err
 	}
@@ -262,11 +262,11 @@ func (a *Application) UpdateItems(ctx context.Context) error {
 
 // Xem UpdateChampions về version vs patch.
 func (a *Application) UpdateSpells(ctx context.Context) error {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return err
 	}
-	spells, err := a.ddragon.GetSummonerSpells(ctx, version, ddragonLang)
+	spells, err := a.ddragon.FetchSummonerSpells(ctx, version, ddragonLang)
 	if err != nil {
 		return err
 	}
@@ -302,11 +302,11 @@ func (a *Application) UpdateSpells(ctx context.Context) error {
 // tham chiếu ngược về chính bảng này.
 // Xem UpdateChampions về version vs patch.
 func (a *Application) UpdateRunes(ctx context.Context) error {
-	version, err := a.ddragon.GetCurrentVersion(ctx)
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
 	if err != nil {
 		return err
 	}
-	trees, err := a.ddragon.GetRunes(ctx, version, ddragonLang)
+	trees, err := a.ddragon.FetchRunes(ctx, version, ddragonLang)
 	if err != nil {
 		return err
 	}
