@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Rune, RuneStat } from '$lib/api';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { STAT_SHARDS } from '$lib/utils/cdragon';
 	import { pct2, winRateColor } from '$lib/utils/format';
@@ -82,14 +83,15 @@
 <!-- icon rune / shard / cây. Đang chọn: sáng, viền màu (nếu có color); còn lại mờ. -->
 {#snippet runeIcon(imgUrl: string | undefined, name: string, active: boolean, sizeClass: string, color?: string)}
 	{#if imgUrl}
-		<img
-			src={imgUrl}
-			alt={name}
-			title={name}
-			class="{sizeClass} shrink-0 rounded-full bg-black/40 {active ? '' : 'opacity-40 grayscale'}"
-			style:box-shadow={active && color ? `0 0 0 2px ${color}` : undefined}
-			loading="lazy"
-		/>
+		<Tooltip content={name} class="inline-flex shrink-0">
+			<img
+				src={imgUrl}
+				alt={name}
+				class="{sizeClass} shrink-0 rounded-full bg-black/40 {active ? '' : 'opacity-40 grayscale'}"
+				style:box-shadow={active && color ? `0 0 0 2px ${color}` : undefined}
+				loading="lazy"
+			/>
+		</Tooltip>
 	{:else}
 		<div class="{sizeClass} shrink-0 rounded-full bg-elevated"></div>
 	{/if}
@@ -136,14 +138,15 @@
 							: 'hover:bg-white/[0.03]'}"
 					>
 						<div class="flex items-center justify-center gap-1.5 {active ? '' : 'opacity-60'}">
-							<img src={primary?.imgUrl} alt={primary?.name} title={primary?.name} class="size-5" />
-							<img
-								src={keystone?.imgUrl}
-								alt={keystone?.name}
-								title={keystone?.name}
-								class="size-9 rounded-full bg-black/40"
-							/>
-							<img src={sub?.imgUrl} alt={sub?.name} title={sub?.name} class="size-5" />
+							<Tooltip content={primary?.name ?? ''}>
+								<img src={primary?.imgUrl} alt={primary?.name} class="size-5" />
+							</Tooltip>
+							<Tooltip content={keystone?.name ?? ''}>
+								<img src={keystone?.imgUrl} alt={keystone?.name} class="size-9 rounded-full bg-black/40" />
+							</Tooltip>
+							<Tooltip content={sub?.name ?? ''}>
+								<img src={sub?.imgUrl} alt={sub?.name} class="size-5" />
+							</Tooltip>
 						</div>
 						<div class="mt-2 grid grid-cols-2 divide-x divide-line text-center text-xs text-muted">
 							<div>

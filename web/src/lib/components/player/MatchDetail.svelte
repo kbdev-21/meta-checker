@@ -3,6 +3,7 @@
 	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
 	import PerfScoreLabel from '$lib/components/player/PerfScoreLabel.svelte';
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { pct0 } from '$lib/utils/format';
@@ -74,7 +75,9 @@
 
 {#snippet icon(src: string | undefined, name: string | undefined, cls: string)}
 	{#if src}
-		<img {src} alt={name ?? ''} title={name} class={cls} loading="lazy" />
+		<Tooltip content={name ?? ''}>
+			<img {src} alt={name ?? ''} class={cls} loading="lazy" />
+		</Tooltip>
 	{:else}
 		<div class="{cls} bg-black/30"></div>
 	{/if}
@@ -109,7 +112,9 @@
 					<div class="relative shrink-0">
 						{#if champ}
 							<a href={championHref(champ.slug, { position: p.position })}>
-								<ChampionIcon src={champ.imgUrl} alt={champ.name} title={champ.name} class="size-8 rounded-full" />
+								<Tooltip content={champ.name}>
+									<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-8 rounded-full" />
+								</Tooltip>
 							</a>
 						{:else}
 							<div class="size-8 rounded-full bg-elevated"></div>
@@ -127,13 +132,16 @@
 						{@render icon(subStyle?.imgUrl, subStyle?.name, 'size-4 rounded-full bg-black/40 p-0.5')}
 					</div>
 					<div class="min-w-0">
-						<a
-							href={playerHref(server, p.name, p.tag)}
-							title="{p.name}#{p.tag}"
-							class="block truncate hover:underline {isMe ? 'font-bold text-white' : 'font-semibold'}"
-						>
-							{p.name}
-						</a>
+						<!-- w-fit max-w-full: span ôm vừa tên (tooltip căn giữa theo tên chứ không theo cả cột)
+						     nhưng không vượt cột để tên dài vẫn truncate -->
+						<Tooltip content="{p.name}#{p.tag}" class="flex w-fit max-w-full">
+							<a
+								href={playerHref(server, p.name, p.tag)}
+								class="block truncate hover:underline {isMe ? 'font-bold text-white' : 'font-semibold'}"
+							>
+								{p.name}
+							</a>
+						</Tooltip>
 						<div class="truncate text-[11px] text-muted">#{p.tag}</div>
 					</div>
 				</div>

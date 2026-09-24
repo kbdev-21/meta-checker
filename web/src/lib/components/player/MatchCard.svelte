@@ -5,6 +5,7 @@
 	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
 	import PerfScoreLabel from '$lib/components/player/PerfScoreLabel.svelte';
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { formatDuration, timeAgo } from '$lib/utils/format';
@@ -91,7 +92,9 @@
 {#snippet itemSlot(itemId: number)}
 	{@const item = itemId ? lolData.itemById.get(itemId) : undefined}
 	{#if item}
-		<img src={item.imgUrl} alt={item.name} title={item.name} class="size-[22px] rounded-md" loading="lazy" />
+		<Tooltip content={item.name}>
+			<img src={item.imgUrl} alt={item.name} class="size-[22px] rounded-md" loading="lazy" />
+		</Tooltip>
 	{:else}
 		<div class="size-[22px] rounded-md bg-black/30"></div>
 	{/if}
@@ -134,7 +137,9 @@
 					<div class="relative">
 						{#if champ}
 							<a href={championHref(champ.slug, { position: me.position })}>
-								<ChampionIcon src={champ.imgUrl} alt={champ.name} title="{champ.name} · Lv {me.champLevel}" class="size-12 rounded-lg" />
+								<Tooltip content={champ.name}>
+									<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-12 rounded-lg" />
+								</Tooltip>
 							</a>
 						{:else}
 							<div class="size-12 rounded-lg bg-elevated"></div>
@@ -151,7 +156,9 @@
 					<div class="flex flex-col gap-1">
 						{#each spells as spell, i (i)}
 							{#if spell}
-								<img src={spell.imgUrl} alt={spell.name} title={spell.name} class="size-[22px] rounded-md" loading="lazy" />
+								<Tooltip content={spell.name}>
+									<img src={spell.imgUrl} alt={spell.name} class="size-[22px] rounded-md" loading="lazy" />
+								</Tooltip>
 							{:else}
 								<div class="size-[22px] rounded-md bg-black/30"></div>
 							{/if}
@@ -160,13 +167,14 @@
 					<div class="flex flex-col gap-1">
 						{#each runes as rune, i (i)}
 							{#if rune}
-								<img
-									src={rune.imgUrl}
-									alt={rune.name}
-									title={rune.name}
-									class="size-[22px] rounded-full bg-black/40 {i === 1 ? 'p-1' : ''}"
-									loading="lazy"
-								/>
+								<Tooltip content={rune.name}>
+									<img
+										src={rune.imgUrl}
+										alt={rune.name}
+										class="size-[22px] rounded-full bg-black/40 {i === 1 ? 'p-1' : ''}"
+										loading="lazy"
+									/>
+								</Tooltip>
 							{:else}
 								<div class="size-[22px] rounded-full bg-black/30"></div>
 							{/if}
@@ -211,20 +219,24 @@
 						<li class="flex items-center gap-1.5 text-xs">
 							{#if pc}
 								<a href={championHref(pc.slug, { position: p.position })} class="shrink-0">
-									<ChampionIcon src={pc.imgUrl} alt={pc.name} title={pc.name} class="size-4 rounded" />
+									<Tooltip content={pc.name}>
+										<ChampionIcon src={pc.imgUrl} alt={pc.name} class="size-4 rounded" />
+									</Tooltip>
 								</a>
 							{:else}
 								<div class="size-4 rounded bg-elevated"></div>
 							{/if}
-							<a
-								href={playerHref(server, p.name, p.tag)}
-								title="{p.name}#{p.tag}"
-								class="truncate hover:underline {p.playerId === playerId
-									? 'font-normal text-white'
-									: 'text-ink/70'}"
-							>
-								{p.name}
-							</a>
+							<!-- min-w-0: span bọc là flex item, không có thì tên dài không co lại để truncate -->
+							<Tooltip content="{p.name}#{p.tag}" class="flex min-w-0">
+								<a
+									href={playerHref(server, p.name, p.tag)}
+									class="truncate hover:underline {p.playerId === playerId
+										? 'font-normal text-white'
+										: 'text-ink/70'}"
+								>
+									{p.name}
+								</a>
+							</Tooltip>
 						</li>
 					{/each}
 				</ul>

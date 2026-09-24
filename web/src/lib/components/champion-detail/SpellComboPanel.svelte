@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SpellComboStat } from '$lib/api';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { pct2, winRateColor } from '$lib/utils/format';
 
@@ -37,7 +38,9 @@
 						{#each [c.spell1Id, c.spell2Id] as id (id)}
 							{@const spell = lolData.spellById.get(id)}
 							{#if spell}
-								<img src={spell.imgUrl} alt={spell.name} title={spell.name} class="size-8 rounded" loading="lazy" />
+								<Tooltip content={spell.name}>
+									<img src={spell.imgUrl} alt={spell.name} class="size-8 rounded" loading="lazy" />
+								</Tooltip>
 							{:else}
 								<div class="size-8 rounded bg-elevated"></div>
 							{/if}

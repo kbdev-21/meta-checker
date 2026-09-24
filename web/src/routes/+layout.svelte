@@ -2,6 +2,7 @@
 	import './layout.css';
 	import brandIcon from '$lib/assets/brand-icon.svg';
 	import Header from '$lib/components/layout/Header.svelte';
+	import TooltipHost from '$lib/components/layout/TooltipHost.svelte';
 	import { loadLolData } from '$lib/stores/lol-data.svelte';
 
 	let { children } = $props();
@@ -19,3 +20,5 @@
 
 <Header />
 {@render children()}
+<!-- 1 tooltip dùng chung cho mọi <Tooltip> trong app -->
+<TooltipHost />

@@ -18,6 +18,7 @@
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
 	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import ServerBadge from '$lib/components/shared/ServerBadge.svelte';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { isFollowed, toggleFollow } from '$lib/stores/followed-players.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
@@ -282,7 +283,9 @@
 							<li class="flex items-center gap-3 px-4 py-2 text-xs">
 								{#if champ}
 									<a href={championHref(champ.slug)}>
-										<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-8 rounded-full" />
+										<Tooltip content={champ.name}>
+											<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-8 rounded-full" />
+										</Tooltip>
 									</a>
 								{:else}
 									<div class="size-8 rounded-full bg-elevated"></div>
@@ -370,8 +373,10 @@
 						{@const champ = lolData.championById.get(c.championId)}
 						<li class="flex items-center gap-2 text-xs">
 							{#if champ}
-								<a href={championHref(champ.slug)} title={champ.name}>
-									<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-6 rounded-full" />
+								<a href={championHref(champ.slug)}>
+									<Tooltip content={champ.name}>
+										<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-6 rounded-full" />
+									</Tooltip>
 								</a>
 							{/if}
 							<span class="font-semibold">{pct0(c.wins / c.games)}</span>

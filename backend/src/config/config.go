@@ -13,6 +13,9 @@ const (
 	defaultRiotRatePer2Min = 100
 )
 
+// Nghỉ giữa 2 player trong 1 lượt crawl.
+const defaultLolCrawlFreqSec = 30
+
 type Config struct {
 	Port                  string
 	PostgresConnectionUrl string
@@ -20,6 +23,7 @@ type Config struct {
 	RiotTimelineApiKey    string // key thứ 2, chỉ dùng fetch match timeline
 	RiotRatePerSec        int
 	RiotRatePer2Min       int
+	LolCrawlFreqSec       int
 }
 
 func LoadConfig() Config {
@@ -38,6 +42,7 @@ func LoadConfig() Config {
 		RiotTimelineApiKey:    os.Getenv("RIOT_TIMELINE_API_KEY"),
 		RiotRatePerSec:        intEnv("RIOT_RATE_PER_SEC", defaultRiotRatePerSec),
 		RiotRatePer2Min:       intEnv("RIOT_RATE_PER_2MIN", defaultRiotRatePer2Min),
+		LolCrawlFreqSec:       intEnv("LOL_CRAWL_FREQ_SEC", defaultLolCrawlFreqSec),
 	}
 }
 

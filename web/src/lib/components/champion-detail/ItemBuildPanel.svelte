@@ -2,6 +2,7 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
 	import type { ItemSetStat, ItemStat } from '$lib/api';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { pct2, winRateColor } from '$lib/utils/format';
 
@@ -40,18 +41,20 @@
 
 {#snippet itemIcon(itemId: number, count = 1)}
 	{@const item = lolData.itemById.get(itemId)}
-	<div class="relative shrink-0" title={item?.name}>
-		{#if item}
-			<img src={item.imgUrl} alt={item.name} class="size-8 rounded" loading="lazy" />
-		{:else}
-			<div class="size-8 rounded bg-elevated"></div>
-		{/if}
-		{#if count > 1}
-			<span class="absolute -bottom-0.5 -right-0.5 rounded-tl bg-base px-0.5 text-[10px] font-bold leading-none">
-				{count}
-			</span>
-		{/if}
-	</div>
+	<Tooltip content={item?.name ?? String(itemId)} class="inline-flex shrink-0">
+		<div class="relative shrink-0">
+			{#if item}
+				<img src={item.imgUrl} alt={item.name} class="size-8 rounded" loading="lazy" />
+			{:else}
+				<div class="size-8 rounded bg-elevated"></div>
+			{/if}
+			{#if count > 1}
+				<span class="absolute -bottom-0.5 -right-0.5 rounded-tl bg-base px-0.5 text-[10px] font-bold leading-none">
+					{count}
+				</span>
+			{/if}
+		</div>
+	</Tooltip>
 {/snippet}
 
 <!-- pick rate + số trận ở giữa, win rate bên phải (giống Spells / Skill Order) -->

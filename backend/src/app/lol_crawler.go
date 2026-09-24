@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-const crawlFreq = 10 * time.Second
 const crawlBatch = 10
 const crawlMatchesPerPlayer = 10
 
@@ -50,7 +49,7 @@ func (a *Application) CrawlMatches(ctx context.Context, crawler *Crawler) error 
 		if err == nil {
 			success++
 		}
-		time.Sleep(crawlFreq)
+		time.Sleep(time.Duration(a.cfg.LolCrawlFreqSec) * time.Second)
 	}
 
 	log.Printf("Crawler server %s: %d/%d players\n", crawler.Server, success, crawlBatch)

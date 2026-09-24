@@ -22,6 +22,7 @@
 	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import MetaServerSelect from '$lib/components/shared/MetaServerSelect.svelte';
 	import TierBadge from '$lib/components/shared/TierBadge.svelte';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { POSITION_ICONS } from '$lib/utils/positions';
@@ -182,11 +183,13 @@
 		<section class="rounded-lg border border-line bg-surface p-4">
 			<div class="flex gap-4">
 				{#if champion}
-					<ChampionIcon
-						src={champion.imgUrl}
-						alt={champion.name}
-						class="size-24 rounded-lg border border-line"
-					/>
+					<Tooltip content={champion.name} class="flex shrink-0">
+						<ChampionIcon
+							src={champion.imgUrl}
+							alt={champion.name}
+							class="size-24 rounded-lg border border-line"
+						/>
+					</Tooltip>
 				{:else}
 					<div class="size-24 shrink-0 animate-pulse rounded-lg bg-elevated"></div>
 				{/if}
@@ -289,9 +292,10 @@
 								<a
 									href={championHref(opp.slug, { position: stat?.position, server })}
 									class="group flex items-center gap-2"
-									title={opp.name}
 								>
-									<ChampionIcon src={opp.imgUrl} alt={opp.name} class="size-7 rounded-full" />
+									<Tooltip content={opp.name} class="inline-flex shrink-0">
+										<ChampionIcon src={opp.imgUrl} alt={opp.name} class="size-7 rounded-full" />
+									</Tooltip>
 									<span class="truncate font-medium group-hover:underline">{opp.name}</span>
 								</a>
 							{:else}
@@ -313,9 +317,11 @@
 					>
 						{#snippet entity(r)}
 							{@const item = lolData.itemById.get(r.itemId)}
-							<div class="flex items-center gap-2" title={item?.name}>
+							<div class="flex items-center gap-2">
 								{#if item}
-									<img src={item.imgUrl} alt={item.name} class="size-7 shrink-0 rounded" loading="lazy" />
+									<Tooltip content={item.name} class="inline-flex shrink-0">
+										<img src={item.imgUrl} alt={item.name} class="size-7 shrink-0 rounded" loading="lazy" />
+									</Tooltip>
 								{:else}
 									<div class="size-7 shrink-0 rounded bg-elevated"></div>
 								{/if}

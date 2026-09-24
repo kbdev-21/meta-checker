@@ -20,6 +20,7 @@
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
 	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import TierBadge from '$lib/components/shared/TierBadge.svelte';
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { POSITION_ICONS } from '$lib/utils/positions';
@@ -293,7 +294,9 @@
 										class="group flex w-fit items-center gap-2.5"
 									>
 										{#if champ}
-											<ChampionIcon src={champ.imgUrl} class="size-7 rounded" />
+											<Tooltip content={champ.name} class="inline-flex shrink-0">
+												<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-7 rounded" />
+											</Tooltip>
 										{:else}
 											<div class="size-7 rounded bg-elevated"></div>
 										{/if}
@@ -325,12 +328,9 @@
 											{@const opp = lolData.championById.get(m.opponentChampionId)}
 											{#if opp}
 												<a href={championHref(opp.slug, { position: row.position, server })}>
-													<ChampionIcon
-														src={opp.imgUrl}
-														alt={opp.name}
-														title="{opp.name} · {pct(m.wins / m.games)}"
-														class="size-6 rounded-full"
-													/>
+													<Tooltip content="{opp.name} · {pct(m.wins / m.games)}">
+														<ChampionIcon src={opp.imgUrl} alt={opp.name} class="size-6 rounded-full" />
+													</Tooltip>
 												</a>
 											{:else}
 												<div class="size-6 rounded-full bg-elevated"></div>
