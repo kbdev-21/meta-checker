@@ -258,7 +258,7 @@
 				<StatTable
 					title="Matchups"
 					label="Opponent"
-					rows={stat?.matchups ?? []}
+					rows={stat?.bestMatchUps ?? []}
 					total={stat?.games ?? 0}
 					rowKey={(r) => r.opponentChampionId}
 					loading={!stat}

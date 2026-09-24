@@ -182,6 +182,7 @@ export type MatchParticipant = {
 	team: number;
 	isWin: boolean;
 	playerId: string;
+	participantId: number; // participantId 1..10 của Riot
 	name: string;
 	tag: string;
 	rankPower: number | null;
@@ -212,6 +213,9 @@ export type MatchParticipant = {
 	trueDmgDealt: number;
 	dmgToTurrets: number;
 	dmgTaken: number;
+	dmgTakenPerMin: number;
+	crowdControl: number; // timeCCingOthers của Riot: điểm CC có trọng số (giống op.gg)
+	ccPerMin: number;
 	heal: number;
 	healOthers: number;
 	shieldOthers: number;
@@ -227,41 +231,55 @@ export type MatchParticipant = {
 	runes: number[];
 	statRunes: number[];
 	items: number[];
+
+	// Từ timeline. Riot không có timeline => mảng rỗng / 0.
+	starterSets: number[]; // item mua trong 60s đầu, bỏ trinket, sort tăng dần
+	skillsLeveled: number[]; // skillSlot theo thứ tự lên: 1 = Q, 2 = W, 3 = E, 4 = R
+	firstLegendItem: number; // 0 = chưa xong đồ legendary nào
+	legendItemsPurchased: number[]; // đồ legendary theo thứ tự mua
 };
 
 // ---------- analytics ----------
 
-export type SpellComboStat = {
-	spell1Id: number;
-	spell2Id: number;
+// Số đếm chung của mọi phần tử build, backend nhúng phẳng vào từng stat.
+export type GameStat = {
 	games: number;
 	wins: number;
 };
 
-export type RuneStat = {
+export type SpellComboStat = GameStat & {
+	spell1Id: number;
+	spell2Id: number;
+};
+
+export type RuneStat = GameStat & {
 	runePrimaryStyle: number;
 	runeSubStyle: number;
 	keyRune: number;
 	runes: number[];
 	statRunes: number[];
-	games: number;
-	wins: number;
 };
 
-export type ItemStat = {
+export type ItemStat = GameStat & {
 	itemId: number;
-	games: number;
-	wins: number;
 };
 
-export type MatchupStat = {
+export type MatchupStat = GameStat & {
 	opponentChampionId: number;
-	games: number;
-	wins: number;
+};
+
+// Một bộ item: starter set (đã sort) hoặc 3 đồ legendary đầu (giữ thứ tự mua).
+export type ItemSetStat = GameStat & {
+	itemIds: number[];
+};
+
+// Thứ tự lên skill (13 lần đầu), mỗi phần tử là skillSlot: 1 = Q, 2 = W, 3 = E, 4 = R.
+export type SkillOrderStat = GameStat & {
+	skills: number[];
 };
 
 // Nhúng luôn patch/server/rankBucket của meta để đứng độc lập được.
-// Không kèm 4 nhóm build: tier list trả hàng trăm dòng nên chúng sẽ chiếm ~85% payload.
+// Không kèm các nhóm build: tier list trả hàng trăm dòng nên chúng sẽ chiếm ~85% payload.
 export type ChampionStatSummary = {
 	patch: string;
 	server: MetaServer;
@@ -288,6 +306,8 @@ export type ChampionStatSummary = {
 	avgCsPerMin: number;
 	avgGoldPerMin: number;
 	avgDmgPerMin: number;
+	avgDmgTakenPerMin: number;
+	avgCcPerMin: number;
 	avgPhysicalDmg: number;
 	avgMagicDmg: number;
 	avgTrueDmg: number;
@@ -295,7 +315,7 @@ export type ChampionStatSummary = {
 	avgSoloKills: number;
 	avgPerfScore: number;
 
-	matchups: MatchupStat[];
+	bestMatchUps: MatchupStat[];
 };
 
 // summary + build, cho endpoint đọc 1 tướng.
@@ -304,6 +324,10 @@ export type ChampionStat = ChampionStatSummary & {
 	bestRunes: RuneStat[];
 	bestLegendaryItems: ItemStat[];
 	bestBootItems: ItemStat[];
+	bestStarterSets: ItemSetStat[];
+	bestSkillsLeveled: SkillOrderStat[];
+	bestFirstLegendItems: ItemStat[];
+	bestFirstThreeItems: ItemSetStat[];
 };
 
 export type Meta = {

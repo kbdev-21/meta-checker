@@ -148,7 +148,7 @@
 
 	// Counter = đối thủ mà champ có win rate thấp nhất khi gặp.
 	const topCounters = (r: ChampionStatSummary) =>
-		r.matchups
+		r.bestMatchUps
 			.filter((m) => m.games >= r.games * MIN_MATCHUP_SHARE)
 			.filter((m) => m.wins / m.games <= MAX_COUNTER_WIN_RATE)
 			.sort((a, b) => a.wins / a.games - b.wins / b.games)
