@@ -31,6 +31,10 @@ func main() {
 	fib.Use(logger.New())
 	fib.Use(compress.New())
 
+	fib.Get("/", func(ctx fiber.Ctx) error {
+		return ctx.JSON("Welcome to MetaChecker API")
+	})
+	
 	router.InitLolDataApiRoutes(fib, a)
 	router.InitLolApiRoutes(fib, a)
 
