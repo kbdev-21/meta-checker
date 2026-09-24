@@ -270,7 +270,7 @@ func (q *Queries) GetChampionStatsByMetaAndChampId(ctx context.Context, arg GetC
 }
 
 const getMatchParticipantsByMatchIds = `-- name: GetMatchParticipantsByMatchIds :many
-SELECT match_id, team, is_win, player_id, participant_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, solo_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, dmg_taken_per_min, crowd_control, cc_per_min, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items, starter_sets, skills_leveled, first_legend_item, legend_items_purchased FROM lol_match_participants
+SELECT match_id, team, is_win, player_id, participant_id, name, tag, rank_power, champion_id, champion_slug, champ_level, position, kills, deaths, assists, kda, kill_participation, double_kills, triple_kills, quadra_kills, penta_kills, solo_kills, gold, gold_per_min, minions_killed, neutral_minions_killed, cs, cs_per_min, dmg_dealt, dmg_per_min, physical_dmg_dealt, magic_dmg_dealt, true_dmg_dealt, dmg_to_turrets, dmg_taken, dmg_taken_per_min, crowd_control, cc_per_min, heal, heal_others, shield_others, vision_score, wards_placed, wards_killed, perf_score, spell1_id, spell2_id, rune_primary_style, rune_sub_style, key_rune, runes, stat_runes, items, role_bound_item, starter_sets, skills_leveled, first_legend_item, legend_items_purchased FROM lol_match_participants
 WHERE match_id = ANY($1::text[])
 ORDER BY match_id, team, array_position(ARRAY['TOP', 'JGL', 'MID', 'ADC', 'SPT'], position), player_id
 `
@@ -338,6 +338,7 @@ func (q *Queries) GetMatchParticipantsByMatchIds(ctx context.Context, matchIds [
 			&i.Runes,
 			&i.StatRunes,
 			&i.Items,
+			&i.RoleBoundItem,
 			&i.StarterSets,
 			&i.SkillsLeveled,
 			&i.FirstLegendItem,
@@ -730,14 +731,16 @@ WITH item_rows AS (
     SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
     FROM lol_match_participants p
     JOIN lol_matches m ON m.id = p.match_id
-    CROSS JOIN LATERAL unnest(p.items) AS iid
-    JOIN lol_items it ON it.id = iid AND it.type = 'BOOTS'
-    WHERE m.patch = $2::text
+    CROSS JOIN LATERAL unnest(p.items || p.role_bound_item) AS iid
+    JOIN lol_items it
+        ON it.id = COALESCE(($2::int[])[array_position($3::int[], iid)], iid)
+       AND it.type = 'BOOTS'
+    WHERE m.patch = $4::text
       AND m.mode = 'SOLO'
       AND NOT m.is_remake
-      AND m.duration_sec >= $3::int
-      AND m.estimated_rank = ANY($4::text[])
-      AND ($5::text = 'GLOBAL' OR m.server = $5::text)
+      AND m.duration_sec >= $5::int
+      AND m.estimated_rank = ANY($6::text[])
+      AND ($7::text = 'GLOBAL' OR m.server = $7::text)
       AND p.position <> 'UNK'
 ),
 agg AS (
@@ -763,16 +766,22 @@ WHERE cs.meta_id = $1::uuid
 `
 
 type RefreshChampionStatsBootItemsParams struct {
-	MetaID      pgtype.UUID `json:"metaId"`
-	Patch       string      `json:"patch"`
-	MinDuration int32       `json:"minDuration"`
-	Ranks       []string    `json:"ranks"`
-	Server      string      `json:"server"`
+	MetaID         pgtype.UUID `json:"metaId"`
+	BaseIds        []int32     `json:"baseIds"`
+	TransformedIds []int32     `json:"transformedIds"`
+	Patch          string      `json:"patch"`
+	MinDuration    int32       `json:"minDuration"`
+	Ranks          []string    `json:"ranks"`
+	Server         string      `json:"server"`
 }
 
+// Giày: xét cả role_bound_item vì giày ADC nằm ở ô riêng đó chứ không trong items. Giày tier 3
+// gộp về giày tier 2 theo cặp transformed_ids[i] => base_ids[i] app truyền vào (cùng khuôn legendary).
 func (q *Queries) RefreshChampionStatsBootItems(ctx context.Context, arg RefreshChampionStatsBootItemsParams) error {
 	_, err := q.db.Exec(ctx, refreshChampionStatsBootItems,
 		arg.MetaID,
+		arg.BaseIds,
+		arg.TransformedIds,
 		arg.Patch,
 		arg.MinDuration,
 		arg.Ranks,
@@ -1095,7 +1104,7 @@ SELECT
     avg(mp.physical_dmg_dealt), avg(mp.magic_dmg_dealt), avg(mp.true_dmg_dealt),
     avg(mp.penta_kills), avg(mp.solo_kills), avg(mp.perf_score)
 FROM (
-    SELECT p.match_id, p.team, p.is_win, p.player_id, p.participant_id, p.name, p.tag, p.rank_power, p.champion_id, p.champion_slug, p.champ_level, p.position, p.kills, p.deaths, p.assists, p.kda, p.kill_participation, p.double_kills, p.triple_kills, p.quadra_kills, p.penta_kills, p.solo_kills, p.gold, p.gold_per_min, p.minions_killed, p.neutral_minions_killed, p.cs, p.cs_per_min, p.dmg_dealt, p.dmg_per_min, p.physical_dmg_dealt, p.magic_dmg_dealt, p.true_dmg_dealt, p.dmg_to_turrets, p.dmg_taken, p.dmg_taken_per_min, p.crowd_control, p.cc_per_min, p.heal, p.heal_others, p.shield_others, p.vision_score, p.wards_placed, p.wards_killed, p.perf_score, p.spell1_id, p.spell2_id, p.rune_primary_style, p.rune_sub_style, p.key_rune, p.runes, p.stat_runes, p.items, p.starter_sets, p.skills_leveled, p.first_legend_item, p.legend_items_purchased
+    SELECT p.match_id, p.team, p.is_win, p.player_id, p.participant_id, p.name, p.tag, p.rank_power, p.champion_id, p.champion_slug, p.champ_level, p.position, p.kills, p.deaths, p.assists, p.kda, p.kill_participation, p.double_kills, p.triple_kills, p.quadra_kills, p.penta_kills, p.solo_kills, p.gold, p.gold_per_min, p.minions_killed, p.neutral_minions_killed, p.cs, p.cs_per_min, p.dmg_dealt, p.dmg_per_min, p.physical_dmg_dealt, p.magic_dmg_dealt, p.true_dmg_dealt, p.dmg_to_turrets, p.dmg_taken, p.dmg_taken_per_min, p.crowd_control, p.cc_per_min, p.heal, p.heal_others, p.shield_others, p.vision_score, p.wards_placed, p.wards_killed, p.perf_score, p.spell1_id, p.spell2_id, p.rune_primary_style, p.rune_sub_style, p.key_rune, p.runes, p.stat_runes, p.items, p.role_bound_item, p.starter_sets, p.skills_leveled, p.first_legend_item, p.legend_items_purchased
     FROM lol_match_participants p
     JOIN lol_matches m ON m.id = p.match_id
     WHERE m.patch = $3::text

@@ -164,6 +164,9 @@ type ParticipantDto struct {
 	Item4 int `json:"item4"`
 	Item5 int `json:"item5"`
 	Item6 int `json:"item6"`
+	// Item của ô riêng do role quest mở, nằm ngoài item0..item6. ADC: giày (xong quest thì giày
+	// chuyển sang ô thứ 7). SPT: control ward. Lane khác: item phần thưởng quest. 0 = không có.
+	RoleBoundItem int `json:"roleBoundItem"`
 
 	Summoner1Id int           `json:"summoner1Id"`
 	Summoner2Id int           `json:"summoner2Id"`

@@ -119,7 +119,8 @@ type MatchParticipant struct {
 	Runes                []int32                `json:"runes"`
 	StatRunes            []int32                `json:"statRunes"`
 	Items                []int32                `json:"items"`
-	StarterSets          []int32                `json:"starterSets"`
+	RoleBoundItem        int32                  `json:"roleBoundItem"` // ô riêng do role quest mở (ADC: giày, SPT: control ward); 0 = không có
+	StarterSets         []int32                `json:"starterSets"`
 	SkillsLeveled        []int32                `json:"skillsLeveled"`
 	FirstLegendItem      int32                  `json:"firstLegendItem"` // 0 = chưa xong đồ legendary nào
 	LegendItemsPurchased []int32                `json:"legendItemsPurchased"`
@@ -180,7 +181,8 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 		Runes:                p.Runes,
 		StatRunes:            p.StatRunes,
 		Items:                p.Items,
-		StarterSets:          p.StarterSets,
+		RoleBoundItem:        p.RoleBoundItem,
+		StarterSets:         p.StarterSets,
 		SkillsLeveled:        p.SkillsLeveled,
 		FirstLegendItem:      p.FirstLegendItem,
 		LegendItemsPurchased: p.LegendItemsPurchased,
@@ -563,6 +565,7 @@ func participantParamsOf(matchId string, p external.ParticipantDto, rankPower sh
 		Runes:            runes,
 		StatRunes:        []int32{int32(p.Perks.StatPerks.Offense), int32(p.Perks.StatPerks.Flex), int32(p.Perks.StatPerks.Defense)},
 		Items:            []int32{int32(p.Item0), int32(p.Item1), int32(p.Item2), int32(p.Item3), int32(p.Item4), int32(p.Item5), int32(p.Item6)},
+		RoleBoundItem:    int32(p.RoleBoundItem),
 
 		// Từ timeline.
 		StarterSets:          build.StarterSets,

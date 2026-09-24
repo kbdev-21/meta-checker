@@ -238,6 +238,7 @@ export type MatchParticipant = {
 	runes: number[];
 	statRunes: number[];
 	items: number[];
+	roleBoundItem: number; // ô riêng do role quest mở (ADC: giày, SPT: control ward, lane khác: item quest); 0 = không có
 
 	// Từ timeline. Riot không có timeline => mảng rỗng / 0.
 	starterSets: number[]; // item mua trong 60s đầu, bỏ trinket, sort tăng dần

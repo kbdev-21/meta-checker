@@ -144,13 +144,13 @@ INSERT INTO lol_match_participants (
     perf_score,
     spell1_id, spell2_id,
     rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
-    items,
+    items, role_bound_item,
     starter_sets, skills_leveled, first_legend_item, legend_items_purchased
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
     $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
-    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57
+    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58
 )
 ON CONFLICT (match_id, player_id) DO NOTHING;
 
@@ -347,13 +347,17 @@ WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
   AND cs.position = sub.position
   AND cs.champion_id = sub.champion_id;
 
+-- Giày: xét cả role_bound_item vì giày ADC nằm ở ô riêng đó chứ không trong items. Giày tier 3
+-- gộp về giày tier 2 theo cặp transformed_ids[i] => base_ids[i] app truyền vào (cùng khuôn legendary).
 -- name: RefreshChampionStatsBootItems :exec
 WITH item_rows AS (
     SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
     FROM lol_match_participants p
     JOIN lol_matches m ON m.id = p.match_id
-    CROSS JOIN LATERAL unnest(p.items) AS iid
-    JOIN lol_items it ON it.id = iid AND it.type = 'BOOTS'
+    CROSS JOIN LATERAL unnest(p.items || p.role_bound_item) AS iid
+    JOIN lol_items it
+        ON it.id = COALESCE((sqlc.arg(base_ids)::int[])[array_position(sqlc.arg(transformed_ids)::int[], iid)], iid)
+       AND it.type = 'BOOTS'
     WHERE m.patch = sqlc.arg(patch)::text
       AND m.mode = 'SOLO'
       AND NOT m.is_remake

@@ -175,6 +175,7 @@ CREATE TABLE IF NOT EXISTS lol_match_participants (
     stat_runes             INTEGER[] NOT NULL,         -- [offense, flex, defense]
 
     items                  INTEGER[] NOT NULL,         -- đủ 7 phần tử item0..item6, giữ 0 cho slot rỗng; phần tử thứ 7 = trinket
+    role_bound_item        INTEGER   NOT NULL,         -- roleBoundItem: ô riêng do role quest mở (ADC: giày, SPT: control ward); 0 = không có
 
     -- Từ timeline, lưu cùng lúc với match. Riot không có timeline (404) => mảng rỗng / 0.
     starter_sets           INTEGER[] NOT NULL DEFAULT '{}', -- item mua trong 60s đầu, bỏ trinket, giữ trùng, sort tăng dần

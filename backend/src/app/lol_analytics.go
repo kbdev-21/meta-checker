@@ -428,9 +428,15 @@ func (a *Application) refreshMeta(ctx context.Context, patch, server string, buc
 	if err != nil {
 		return err
 	}
+	items, err := q.ListItems(ctx)
+	if err != nil {
+		return err
+	}
+	tierThreeIds, tierTwoIds := bootTierTwoPairs(items)
 	err = q.RefreshChampionStatsBootItems(ctx, db.RefreshChampionStatsBootItemsParams{
 		MetaID: metaId, Patch: patch,
 		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+		TransformedIds: tierThreeIds, BaseIds: tierTwoIds,
 	})
 	if err != nil {
 		return err
@@ -489,6 +495,44 @@ func transformedItemPairs() (transformedIds, baseIds []int32) {
 		baseIds = append(baseIds, base)
 	}
 	return transformedIds, baseIds
+}
+
+// Giày tier 3 => giày tier 2 tương ứng, tách thành 2 mảng song song như transformedItemPairs.
+// Tier 2 = BOOTS chỉ ghép từ giày thường (1001 là BASIC); tier 3 = BOOTS có thành phần là BOOTS.
+// Đi ngược chuỗi from tới tier 2 vì có giày qua nhiều bậc (Forever Forward 3176 => Synchronized
+// Souls 3013 => Symbiotic Soles 3010). Suy từ lol_items để Riot thêm giày mới thì tự nhận.
+func bootTierTwoPairs(items []db.LolItem) (tierThreeIds, tierTwoIds []int32) {
+	boots := map[int32]db.LolItem{}
+	for _, it := range items {
+		if ItemType(it.Type) == ItemTypeBoots {
+			boots[it.ID] = it
+		}
+	}
+	// Thành phần là BOOTS của 1 giày; không có => giày đó là tier 2.
+	bootsFromOf := func(it db.LolItem) (db.LolItem, bool) {
+		for _, id := range it.FromItems {
+			if from, ok := boots[id]; ok {
+				return from, true
+			}
+		}
+		return db.LolItem{}, false
+	}
+	for _, it := range boots {
+		base, ok := bootsFromOf(it)
+		if !ok {
+			continue
+		}
+		for {
+			next, ok := bootsFromOf(base)
+			if !ok {
+				break
+			}
+			base = next
+		}
+		tierThreeIds = append(tierThreeIds, it.ID)
+		tierTwoIds = append(tierTwoIds, base.ID)
+	}
+	return tierThreeIds, tierTwoIds
 }
 
 // Các estimated_rank thuộc 1 bucket.

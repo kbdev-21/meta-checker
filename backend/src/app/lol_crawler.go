@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const crawlFreq = 20 * time.Second
+const crawlFreq = 10 * time.Second
 const crawlBatch = 10
 const crawlMatchesPerPlayer = 10
 

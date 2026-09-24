@@ -32,13 +32,13 @@ INSERT INTO lol_match_participants (
     perf_score,
     spell1_id, spell2_id,
     rune_primary_style, rune_sub_style, key_rune, runes, stat_runes,
-    items,
+    items, role_bound_item,
     starter_sets, skills_leveled, first_legend_item, legend_items_purchased
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
     $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
-    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57
+    $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58
 )
 ON CONFLICT (match_id, player_id) DO NOTHING
 `
@@ -103,6 +103,7 @@ type InsertMatchParticipantsParams struct {
 	Runes                []int32     `json:"runes"`
 	StatRunes            []int32     `json:"statRunes"`
 	Items                []int32     `json:"items"`
+	RoleBoundItem        int32       `json:"roleBoundItem"`
 	StarterSets          []int32     `json:"starterSets"`
 	SkillsLeveled        []int32     `json:"skillsLeveled"`
 	FirstLegendItem      int32       `json:"firstLegendItem"`
@@ -167,6 +168,7 @@ func (q *Queries) InsertMatchParticipants(ctx context.Context, arg []InsertMatch
 			a.Runes,
 			a.StatRunes,
 			a.Items,
+			a.RoleBoundItem,
 			a.StarterSets,
 			a.SkillsLeveled,
 			a.FirstLegendItem,

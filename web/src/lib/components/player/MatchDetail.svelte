@@ -6,6 +6,7 @@
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { pct0 } from '$lib/utils/format';
+	import { lastSlotItemOf } from '$lib/utils/match';
 	import { playerHref } from '$lib/utils/riot-id';
 
 	type Props = {
@@ -178,9 +179,10 @@
 				</div>
 
 				<!-- items -->
-				<!-- id 0 = ô trống, itemById.get(0) trả undefined nên tự thành ô xám -->
+				<!-- id 0 = ô trống, itemById.get(0) trả undefined nên tự thành ô xám.
+				     Ô cuối là trinket, riêng ADC là giày (xem lastSlotItemOf). -->
 				<div class="flex gap-0.5">
-					{#each p.items as itemId, i (i)}
+					{#each [...p.items.slice(0, ITEM_SLOTS), lastSlotItemOf(p)] as itemId, i (i)}
 						{@const item = lolData.itemById.get(itemId)}
 						<div class={i === ITEM_SLOTS ? 'ml-0.5' : ''}>
 							{@render icon(item?.imgUrl, item?.name, 'size-[22px] rounded-md')}

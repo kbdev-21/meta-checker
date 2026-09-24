@@ -152,6 +152,7 @@ type LolMatchParticipant struct {
 	Runes                []int32     `json:"runes"`
 	StatRunes            []int32     `json:"statRunes"`
 	Items                []int32     `json:"items"`
+	RoleBoundItem        int32       `json:"roleBoundItem"`
 	StarterSets          []int32     `json:"starterSets"`
 	SkillsLeveled        []int32     `json:"skillsLeveled"`
 	FirstLegendItem      int32       `json:"firstLegendItem"`

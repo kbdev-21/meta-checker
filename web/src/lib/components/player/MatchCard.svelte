@@ -8,6 +8,7 @@
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { formatDuration, timeAgo } from '$lib/utils/format';
+	import { lastSlotItemOf } from '$lib/utils/match';
 	import { POSITION_ICONS } from '$lib/utils/positions';
 	import { playerHref } from '$lib/utils/riot-id';
 
@@ -69,7 +70,7 @@
 	const spells = $derived(me ? [me.spell1Id, me.spell2Id].map((id) => lolData.spellById.get(id)) : []);
 	const runes = $derived(me ? [me.keyRune, me.runeSubStyle].map((id) => lolData.runeById.get(id)) : []);
 	const items = $derived(me ? me.items.slice(0, ITEM_SLOTS) : []);
-	const trinket = $derived(me ? me.items[ITEM_SLOTS] : 0);
+	const lastSlotItem = $derived(me ? lastSlotItemOf(me) : 0);
 
 	// AI-Score = perfScore. Điểm cao nhất team thắng là MVP, team thua là ACE;
 	// còn lại hiện thứ hạng điểm trong cả trận (1st..10th).
@@ -187,7 +188,7 @@
 				{#each items as itemId, i (i)}
 					{@render itemSlot(itemId)}
 				{/each}
-				<div class="ml-1">{@render itemSlot(trinket)}</div>
+				<div class="ml-1">{@render itemSlot(lastSlotItem)}</div>
 			</div>
 		</div>
 

@@ -275,9 +275,9 @@ type ItemType string
 const (
 	ItemTypeConsumable ItemType = "CONSUMABLE" // tags có Consumable
 	ItemTypeTrinket    ItemType = "TRINKET"    // tags có Trinket
-	ItemTypeBoots      ItemType = "BOOTS"      // tags có Boots
+	ItemTypeBoots      ItemType = "BOOTS"      // giày tier 2 trở lên, xem isBootsItem
 	ItemTypeStarter    ItemType = "STARTER"    // không from, không into, còn mua được
-	ItemTypeBasic      ItemType = "BASIC"      // không from, có into
+	ItemTypeBasic      ItemType = "BASIC"      // không from, có into; gồm cả giày thường 300 vàng (1001)
 	ItemTypeEpic       ItemType = "EPIC"       // có from, có into
 	ItemTypeLegendary  ItemType = "LEGENDARY"  // có from, không into
 )
@@ -303,7 +303,8 @@ func itemTypeOf(it external.DDItem, items map[string]external.DDItem) (t ItemTyp
 		return ItemTypeConsumable, true
 	case slices.Contains(it.Tags, "Trinket"):
 		return ItemTypeTrinket, true
-	case slices.Contains(it.Tags, "Boots"):
+	// Giày thường (không from) không vào đây mà rơi xuống BASIC.
+	case hasFrom && isBootsItem(it, items):
 		return ItemTypeBoots, true
 	case !hasFrom && !hasInto && it.Gold.Purchasable:
 		return ItemTypeStarter, true
@@ -321,4 +322,18 @@ func itemTypeOf(it external.DDItem, items map[string]external.DDItem) (t ItemTyp
 		return itemTypeOf(base, items)
 	}
 	return "", false
+}
+
+// Có tag Boots, hoặc có thành phần mang tag Boots: ddragon thiếu tag Boots ở vài giày tier 3
+// (vd Gunmetal Greaves 3172), vế sau bắt được chúng qua giày tier 2 làm thành phần.
+func isBootsItem(it external.DDItem, items map[string]external.DDItem) bool {
+	if slices.Contains(it.Tags, "Boots") {
+		return true
+	}
+	for _, id := range it.From {
+		if slices.Contains(items[id].Tags, "Boots") {
+			return true
+		}
+	}
+	return false
 }
