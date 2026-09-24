@@ -87,8 +87,15 @@ export type Champion = {
 	name: string;
 	title: string;
 	imgUrl: string;
+	skills: ChampionSkill[]; // Q, W, E, R
 	patch: string;
 	updatedAt: string;
+};
+
+// Skill Q/W/E/R của champion (không phải summoner spell).
+export type ChampionSkill = {
+	name: string;
+	imgUrl: string;
 };
 
 export type Item = {

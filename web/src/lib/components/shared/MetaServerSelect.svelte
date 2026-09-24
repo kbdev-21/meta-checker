@@ -3,7 +3,7 @@
 	import Triangle from '@lucide/svelte/icons/triangle';
 
 	import { META_SERVERS, type MetaServer } from '$lib/api';
-	import { dismissOn } from '$lib/dismiss';
+	import { dismissOn } from '$lib/utils/dismiss';
 
 	type Props = {
 		server: MetaServer;

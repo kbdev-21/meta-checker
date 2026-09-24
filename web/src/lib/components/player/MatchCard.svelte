@@ -1,14 +1,15 @@
 <script lang="ts">
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import type { GameMode, Match, Server } from '$lib/api';
-	import ChampionIcon from '$lib/components/ChampionIcon.svelte';
-	import MatchDetail from '$lib/components/MatchDetail.svelte';
-	import PerfScoreBadge from '$lib/components/PerfScoreBadge.svelte';
-	import PerfScoreLabel from '$lib/components/PerfScoreLabel.svelte';
-	import { formatDuration, timeAgo } from '$lib/format';
-	import { POSITION_ICONS } from '$lib/positions';
-	import { playerHref } from '$lib/riot-id';
+	import MatchDetail from '$lib/components/player/MatchDetail.svelte';
+	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
+	import PerfScoreLabel from '$lib/components/player/PerfScoreLabel.svelte';
+	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
+	import { championHref } from '$lib/utils/champion';
+	import { formatDuration, timeAgo } from '$lib/utils/format';
+	import { POSITION_ICONS } from '$lib/utils/positions';
+	import { playerHref } from '$lib/utils/riot-id';
 
 	type Props = {
 		match: Match;
@@ -22,7 +23,7 @@
 	// Đang mở MatchDetail bên dưới card hay không.
 	let expanded = $state(false);
 
-	// Click bất kỳ đâu trên card để mở/đóng detail, trừ link (tên player) và nút mũi tên
+	// Click bất kỳ đâu trên card để mở/đóng detail, trừ link (champion, tên player) và nút mũi tên
 	// (nút tự toggle, không bỏ qua thì bị toggle 2 lần).
 	function onCardClick(e: MouseEvent) {
 		if ((e.target as HTMLElement).closest('a, button')) return;
@@ -131,7 +132,9 @@
 				<div class="flex gap-1">
 					<div class="relative">
 						{#if champ}
-							<ChampionIcon src={champ.imgUrl} alt={champ.name} title="{champ.name} · Lv {me.champLevel}" class="size-12 rounded-lg" />
+							<a href={championHref(champ.slug, { position: me.position })}>
+								<ChampionIcon src={champ.imgUrl} alt={champ.name} title="{champ.name} · Lv {me.champLevel}" class="size-12 rounded-lg" />
+							</a>
 						{:else}
 							<div class="size-12 rounded-lg bg-elevated"></div>
 						{/if}
@@ -206,7 +209,9 @@
 						{@const pc = lolData.championById.get(p.championId)}
 						<li class="flex items-center gap-1.5 text-xs">
 							{#if pc}
-								<ChampionIcon src={pc.imgUrl} alt={pc.name} title={pc.name} class="size-4 rounded" />
+								<a href={championHref(pc.slug, { position: p.position })} class="shrink-0">
+									<ChampionIcon src={pc.imgUrl} alt={pc.name} title={pc.name} class="size-4 rounded" />
+								</a>
 							{:else}
 								<div class="size-4 rounded bg-elevated"></div>
 							{/if}

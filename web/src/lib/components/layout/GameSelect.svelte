@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import { dismissOn } from '$lib/dismiss';
+	import { dismissOn } from '$lib/utils/dismiss';
 
 	// Game mà app hỗ trợ. Thêm game mới = thêm 1 dòng ở đây.
 	const GAMES = [{ id: 'LOL', name: 'League of Legends', short: 'LoL' }] as const;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import Star from '@lucide/svelte/icons/star';
 	import { untrack } from 'svelte';
 
 	import {
@@ -7,25 +7,27 @@
 		getMatchesByPlayerInfo,
 		isApiError,
 		MATCH_LIST_MAX_COUNT,
-		updatePlayerByInfo,
 		type Match,
 		type MatchListMode,
 		type Player,
 		type Position
 	} from '$lib/api';
-	import ChampionIcon from '$lib/components/ChampionIcon.svelte';
-	import MatchCard from '$lib/components/MatchCard.svelte';
-	import PerfScoreBadge from '$lib/components/PerfScoreBadge.svelte';
-	import RankCard from '$lib/components/RankCard.svelte';
-	import { ddragonVersionOf, profileIconUrl } from '$lib/ddragon';
-	import { pct0, timeAgo } from '$lib/format';
-	import { POSITION_ICONS } from '$lib/positions';
+	import MatchCard from '$lib/components/player/MatchCard.svelte';
+	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
+	import RankCard from '$lib/components/player/RankCard.svelte';
+	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import ServerBadge from '$lib/components/shared/ServerBadge.svelte';
+	import { isFollowed, toggleFollow } from '$lib/stores/followed-players.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
+	import { championHref } from '$lib/utils/champion';
+	import { ddragonVersionOf, profileIconUrl } from '$lib/utils/ddragon';
+	import { pct0 } from '$lib/utils/format';
+	import { POSITION_ICONS } from '$lib/utils/positions';
 
 	let { data } = $props();
 
 	// Tab chưa làm, tạm hiển thị cho đủ layout.
-	const TABS = ['Summary', 'Champions', 'Mastery', 'Live Game'] as const;
+	const TABS = ['Summary', 'Champions', 'Live Game'] as const;
 
 	const MODE_FILTERS: { value: MatchListMode | 'ALL'; label: string }[] = [
 		{ value: 'ALL', label: 'All' },
@@ -34,7 +36,7 @@
 	];
 
 	// Lần đầu lấy 20 trận (= MATCH_LIST_MAX_COUNT), mỗi lần "Show more" lấy thêm 10.
-	const INITIAL_MATCH_COUNT = MATCH_LIST_MAX_COUNT;
+	const INITIAL_MATCH_COUNT = 10;
 	const MORE_MATCH_COUNT = 10;
 
 	const SUMMARY_POSITIONS: Position[] = ['TOP', 'JGL', 'MID', 'ADC', 'SPT'];
@@ -50,8 +52,6 @@
 	let matchesLoading = $state(true);
 	let matchesError = $state<unknown>(null);
 	let hasMore = $state(false);
-
-	let updating = $state(false);
 
 	// Response cũ (player trước / mode trước) có thể về sau response mới: chỉ nhận request mới nhất.
 	let playerReq = 0;
@@ -108,17 +108,7 @@
 		}
 	}
 
-	// Ép backend lấy lại từ Riot rồi load lại cả trang.
-	async function update() {
-		updating = true;
-		try {
-			await updatePlayerByInfo(data.server, data.name, data.tag);
-		} finally {
-			updating = false;
-		}
-		loadPlayer();
-		loadMatches(0);
-	}
+	const followed = $derived(player !== null && isFollowed(player.id));
 
 	const ddVersion = $derived(
 		ddragonVersionOf(lolData.championById.values().next().value?.imgUrl ?? '')
@@ -216,24 +206,27 @@
 					<h1 class="truncate text-2xl font-bold">
 						{player.name} <span class="font-normal text-muted">#{player.tag}</span>
 					</h1>
-					<div class="mt-0.5 text-sm text-muted">{player.server}</div>
+					<div class="mt-1 flex">
+						<ServerBadge server={player.server} size="MD" />
+					</div>
 					<div class="mt-3 flex items-center gap-3">
+						<!-- chưa follow: nút vàng nổi bật; đã follow: nút tối, sao tô vàng -->
 						<button
 							type="button"
-							onclick={update}
-							disabled={updating}
-							class="flex h-9 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-black outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-60"
+							onclick={() => toggleFollow(player!)}
+							aria-pressed={followed}
+							class="flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/60 {followed
+								? 'bg-elevated text-ink ring-1 ring-line'
+								: 'bg-accent text-black'}"
 						>
-							<RefreshCw class="size-4 {updating ? 'animate-spin' : ''}" />
-							{updating ? 'Updating…' : 'Update'}
-						</button>
-						<span class="text-xs text-muted">Last updated: {timeAgo(player.updatedAt)}</span>
-					</div>
+							<Star class="size-4 {followed ? 'fill-accent text-accent' : ''}" />
+							{followed ? 'Following' : 'Follow'}
+						</button>					</div>
 				</div>
 			</div>
 
 			<!-- tab nằm ở đáy card, gạch chân active trùng mép dưới card -->
-			<nav class="flex gap-6 border-t border-line/60 pt-3 text-sm">
+			<nav class="flex gap-6 text-sm">
 				{#each TABS as tab, i (tab)}
 					<button
 						type="button"
@@ -279,12 +272,20 @@
 							{@const champ = lolData.championById.get(c.championId)}
 							<li class="flex items-center gap-3 px-4 py-2 text-xs">
 								{#if champ}
-									<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-8 rounded-full" />
+									<a href={championHref(champ.slug)}>
+										<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-8 rounded-full" />
+									</a>
 								{:else}
 									<div class="size-8 rounded-full bg-elevated"></div>
 								{/if}
 								<div class="min-w-0 flex-1">
-									<div class="truncate text-sm font-semibold">{champ?.name ?? c.championId}</div>
+									{#if champ}
+										<a href={championHref(champ.slug)} class="block truncate text-sm font-semibold hover:underline">
+											{champ.name}
+										</a>
+									{:else}
+										<div class="truncate text-sm font-semibold">{c.championId}</div>
+									{/if}
 									<div class="text-muted">{kdaOf(c)}:1 KDA</div>
 								</div>
 								<div class="text-right">
@@ -360,7 +361,9 @@
 						{@const champ = lolData.championById.get(c.championId)}
 						<li class="flex items-center gap-2 text-xs">
 							{#if champ}
-								<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-6 rounded-full" />
+								<a href={championHref(champ.slug)} title={champ.name}>
+									<ChampionIcon src={champ.imgUrl} alt={champ.name} class="size-6 rounded-full" />
+								</a>
 							{/if}
 							<span class="font-semibold">{pct0(c.wins / c.games)}</span>
 							<span class="text-muted">({c.wins}W {c.games - c.wins}L)</span>

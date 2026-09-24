@@ -16,11 +16,12 @@
 		type Position,
 		type RankBucket
 	} from '$lib/api';
-	import ChampionIcon from '$lib/components/ChampionIcon.svelte';
-	import ChampionsToolbar from '$lib/components/ChampionsToolbar.svelte';
-	import TierBadge from '$lib/components/TierBadge.svelte';
-	import { POSITION_ICONS } from '$lib/positions';
+	import ChampionsToolbar from '$lib/components/champions/ChampionsToolbar.svelte';
+	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import TierBadge from '$lib/components/shared/TierBadge.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
+	import { championHref } from '$lib/utils/champion';
+	import { POSITION_ICONS } from '$lib/utils/positions';
 
 	let meta = $state<Meta | null>(null);
 	let loading = $state(true);
@@ -143,7 +144,7 @@
 	// Matchup gặp ít hơn 3% số trận của champ thì mẫu quá nhỏ, không tính là counter.
 	const MIN_MATCHUP_SHARE = 0.03;
 	// Champ vẫn thắng quá 48% khi gặp thì đối thủ đó không đủ khắc chế để gọi là counter.
-	const MAX_COUNTER_WIN_RATE = 0.48;
+	const MAX_COUNTER_WIN_RATE = 0.45;
 	const COUNTER_COUNT = 3;
 
 	// Counter = đối thủ mà champ có win rate thấp nhất khi gặp.
@@ -199,7 +200,7 @@
 
 <div class="mx-auto max-w-[1100px] px-5 py-6">
 	<div class="mb-4">
-		<h1 class="text-xl font-semibold">Champion Tier List</h1>
+		<h1 class="text-xl font-semibold">LOL Champion Tier List</h1>
 		{#if meta}
 			<p class="mt-1 text-sm text-muted">
 				{meta.patch} · {RANK_BUCKET_LABEL[meta.rankBucket]} · {meta.totalMatches.toLocaleString()} matches
@@ -279,14 +280,17 @@
 									{/if}
 								</td>
 								<td class="px-3 py-2">
-									<div class="flex items-center gap-2.5">
+									<a
+										href={championHref(row.championSlug, { position: row.position, server })}
+										class="group flex w-fit items-center gap-2.5"
+									>
 										{#if champ}
 											<ChampionIcon src={champ.imgUrl} class="size-7 rounded" />
 										{:else}
 											<div class="size-7 rounded bg-elevated"></div>
 										{/if}
-										<span class="font-semibold text-white">{champ?.name ?? row.championSlug}</span>
-									</div>
+										<span class="font-semibold text-white group-hover:underline">{champ?.name ?? row.championSlug}</span>
+									</a>
 								</td>
 								<td class="px-3 py-2">
 									<TierBadge tier={row.tier} class="mx-auto" />
@@ -312,12 +316,14 @@
 										{#each topCounters(row) as m (m.opponentChampionId)}
 											{@const opp = lolData.championById.get(m.opponentChampionId)}
 											{#if opp}
-												<ChampionIcon
-													src={opp.imgUrl}
-													alt={opp.name}
-													title="{opp.name} · {pct(m.wins / m.games)}"
-													class="size-6 rounded-full"
-												/>
+												<a href={championHref(opp.slug, { position: row.position, server })}>
+													<ChampionIcon
+														src={opp.imgUrl}
+														alt={opp.name}
+														title="{opp.name} · {pct(m.wins / m.games)}"
+														class="size-6 rounded-full"
+													/>
+												</a>
 											{:else}
 												<div class="size-6 rounded-full bg-elevated"></div>
 											{/if}

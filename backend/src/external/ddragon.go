@@ -90,9 +90,10 @@ func (c *DDragonClient) FetchCurrentVersion(ctx context.Context) (string, error)
 }
 
 // key = champion id dạng tên (vd "Aatrox"); DDChampion.Key = championId số trong match.
+// Đọc championFull.json (~2MB) thay vì champion.json để có luôn skill của mọi champion trong 1 request.
 func (c *DDragonClient) FetchChampions(ctx context.Context, version, lang string) (map[string]DDChampion, error) {
 	var out ddResponse[DDChampion]
-	err := c.get(ctx, dataPath(version, lang, "champion.json"), &out)
+	err := c.get(ctx, dataPath(version, lang, "championFull.json"), &out)
 	if err != nil {
 		return nil, err
 	}

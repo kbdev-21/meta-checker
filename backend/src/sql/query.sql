@@ -1,11 +1,12 @@
 -- name: UpsertChampion :exec
-INSERT INTO lol_champions (id, slug, name, title, img_url, patch)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO lol_champions (id, slug, name, title, img_url, skills, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE SET
     slug       = EXCLUDED.slug,
     name       = EXCLUDED.name,
     title      = EXCLUDED.title,
     img_url    = EXCLUDED.img_url,
+    skills     = EXCLUDED.skills,
     patch      = EXCLUDED.patch,
     updated_at = now();
 
@@ -43,11 +44,12 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Cây (style_id NULL) phải upsert trước rune của nó vì style_id tham chiếu ngược về chính bảng này.
 -- name: UpsertRune :exec
-INSERT INTO lol_runes (id, style_id, slot, slug, name, short_desc, img_url, patch)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO lol_runes (id, style_id, slot, sort_order, slug, name, short_desc, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (id) DO UPDATE SET
     style_id   = EXCLUDED.style_id,
     slot       = EXCLUDED.slot,
+    sort_order = EXCLUDED.sort_order,
     slug       = EXCLUDED.slug,
     name       = EXCLUDED.name,
     short_desc = EXCLUDED.short_desc,
@@ -58,9 +60,9 @@ ON CONFLICT (id) DO UPDATE SET
 -- name: ListSpells :many
 SELECT * FROM lol_spells ORDER BY id;
 
--- Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng.
+-- Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng; trong 1 hàng theo thứ tự trong game.
 -- name: ListRunes :many
-SELECT * FROM lol_runes ORDER BY style_id NULLS FIRST, slot, id;
+SELECT * FROM lol_runes ORDER BY style_id NULLS FIRST, slot NULLS FIRST, sort_order;
 
 -- Rank solo/flex truyền vào NULL (unknown) thì giữ nguyên cả nhóm cột rank cũ.
 -- name: UpsertPlayer :exec
@@ -304,14 +306,18 @@ WHERE cs.meta_id = sqlc.arg(meta_id)::uuid
   AND cs.position = sub.position
   AND cs.champion_id = sub.champion_id;
 
--- Item legendary: unnest items rồi lọc theo lol_items.type.
+-- Item legendary: unnest items rồi lọc theo lol_items.type. Item biến đổi (Muramana...) gộp về
+-- item gốc (Manamune...) theo cặp transformed_ids[i] => base_ids[i] app truyền vào.
 -- name: RefreshChampionStatsLegendaryItems :exec
 WITH item_rows AS (
     SELECT p.position, p.champion_id, p.is_win, it.id AS item_id
     FROM lol_match_participants p
     JOIN lol_matches m ON m.id = p.match_id
     CROSS JOIN LATERAL unnest(p.items) AS iid
-    JOIN lol_items it ON it.id = iid AND it.type = 'LEGENDARY'
+    -- iid không có trong transformed_ids => array_position NULL => phần tử NULL => giữ iid.
+    JOIN lol_items it
+        ON it.id = COALESCE((sqlc.arg(base_ids)::int[])[array_position(sqlc.arg(transformed_ids)::int[], iid)], iid)
+       AND it.type = 'LEGENDARY'
     WHERE m.patch = sqlc.arg(patch)::text
       AND m.mode = 'SOLO'
       AND NOT m.is_remake

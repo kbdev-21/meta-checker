@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { SERVERS, type Server } from '$lib/api';
-import { parseRiotIdSlug } from '$lib/riot-id';
+import { parseRiotIdSlug } from '$lib/utils/riot-id';
 import type { PageLoad } from './$types';
 
 // Vô số player nên không prerender được: build ra fallback 200.html (xem vite.config.ts),

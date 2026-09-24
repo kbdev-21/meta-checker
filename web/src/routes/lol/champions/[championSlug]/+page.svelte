@@ -13,12 +13,17 @@
 		type Position,
 		type RankBucket
 	} from '$lib/api';
-	import ChampionIcon from '$lib/components/ChampionIcon.svelte';
-	import MetaServerSelect from '$lib/components/MetaServerSelect.svelte';
-	import StatTable from '$lib/components/StatTable.svelte';
-	import TierBadge from '$lib/components/TierBadge.svelte';
-	import { POSITION_ICONS } from '$lib/positions';
+	import ItemBuildPanel from '$lib/components/champion-detail/ItemBuildPanel.svelte';
+	import RunePanel from '$lib/components/champion-detail/RunePanel.svelte';
+	import SkillOrderPanel from '$lib/components/champion-detail/SkillOrderPanel.svelte';
+	import SpellComboPanel from '$lib/components/champion-detail/SpellComboPanel.svelte';
+	import StatTable from '$lib/components/champion-detail/StatTable.svelte';
+	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import MetaServerSelect from '$lib/components/shared/MetaServerSelect.svelte';
+	import TierBadge from '$lib/components/shared/TierBadge.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
+	import { championHref } from '$lib/utils/champion';
+	import { POSITION_ICONS } from '$lib/utils/positions';
 
 	let { data } = $props();
 
@@ -73,6 +78,16 @@
 		const search = params.size ? `?${params}` : '';
 		if (search === location.search) return;
 		replaceState(`${location.pathname}${search}`, page.state);
+	});
+
+	// Link matchup dẫn sang champion khác cùng route nên SvelteKit giữ nguyên component: đọc lại
+	// position từ URL mới và bỏ stats của champion cũ (không thì hiện nhầm trong lúc tải).
+	let currentSlug = untrack(() => data.slug);
+	$effect.pre(() => {
+		if (data.slug === currentSlug) return;
+		currentSlug = data.slug;
+		position = oneOf(page.url.searchParams.get('position')?.toUpperCase() ?? null, FILTER_POSITIONS, null);
+		stats = null;
 	});
 
 	// Đổi champion / server liên tục thì response cũ có thể về sau: chỉ nhận request mới nhất.
@@ -229,52 +244,72 @@
 			{/if}
 		</section>
 
-		<!-- 3 cột island; cột trái chưa có nội dung -->
+		<!-- cột trái chiếm 2/3 (runes, spells, skill order); cột phải xếp dọc Matchups rồi Legendary Items -->
 		{#if !error && (loading || stat)}
 			<div class="mt-3 grid items-start gap-3 lg:grid-cols-3">
-				<section class="self-stretch rounded-lg border border-line bg-surface"></section>
+				<div class="flex min-w-0 flex-col gap-3 lg:col-span-2">
+					<RunePanel runes={stat?.bestRunes ?? []} loading={!stat} />
+					<SpellComboPanel combos={stat?.bestSpellCombos ?? []} loading={!stat} />
+					<SkillOrderPanel orders={stat?.bestSkillsLeveled ?? []} {champion} loading={!stat} />
+					<ItemBuildPanel
+						starterSets={stat?.bestStarterSets ?? []}
+						bootItems={stat?.bestBootItems ?? []}
+						coreBuilds={stat?.bestFirstThreeItems ?? []}
+						games={stat?.games ?? 0}
+						loading={!stat}
+					/>
+				</div>
 
-				<StatTable
-					title="Legendary Items"
-					label="Item"
-					rows={stat?.bestLegendaryItems ?? []}
-					total={stat?.games ?? 0}
-					rowKey={(r) => r.itemId}
-					loading={!stat}
-				>
-					{#snippet entity(r)}
-						{@const item = lolData.itemById.get(r.itemId)}
-						<div class="flex items-center gap-2" title={item?.name}>
-							{#if item}
-								<img src={item.imgUrl} alt={item.name} class="size-7 shrink-0 rounded" loading="lazy" />
-							{:else}
-								<div class="size-7 shrink-0 rounded bg-elevated"></div>
-							{/if}
-							<span class="truncate font-medium">{item?.name ?? r.itemId}</span>
-						</div>
-					{/snippet}
-				</StatTable>
-
-				<StatTable
-					title="Matchups"
-					label="Opponent"
-					rows={stat?.bestMatchUps ?? []}
-					total={stat?.games ?? 0}
-					rowKey={(r) => r.opponentChampionId}
-					loading={!stat}
-				>
-					{#snippet entity(r)}
-						{@const opp = lolData.championById.get(r.opponentChampionId)}
-						<div class="flex items-center gap-2" title={opp?.name}>
+				<div class="flex min-w-0 flex-col gap-3">
+					<StatTable
+						title="Matchups"
+						label="Opponent"
+						rows={stat?.bestMatchUps ?? []}
+						total={stat?.games ?? 0}
+						rowKey={(r) => r.opponentChampionId}
+						loading={!stat}
+					>
+						{#snippet entity(r)}
+							{@const opp = lolData.championById.get(r.opponentChampionId)}
 							{#if opp}
-								<ChampionIcon src={opp.imgUrl} alt={opp.name} class="size-7 rounded-full" />
+								<a
+									href={championHref(opp.slug, { position: stat?.position, server })}
+									class="group flex items-center gap-2"
+									title={opp.name}
+								>
+									<ChampionIcon src={opp.imgUrl} alt={opp.name} class="size-7 rounded-full" />
+									<span class="truncate font-medium group-hover:underline">{opp.name}</span>
+								</a>
 							{:else}
-								<div class="size-7 shrink-0 rounded-full bg-elevated"></div>
+								<div class="flex items-center gap-2">
+									<div class="size-7 shrink-0 rounded-full bg-elevated"></div>
+									<span class="truncate font-medium">{r.opponentChampionId}</span>
+								</div>
 							{/if}
-							<span class="truncate font-medium">{opp?.name ?? r.opponentChampionId}</span>
-						</div>
-					{/snippet}
-				</StatTable>
+						{/snippet}
+					</StatTable>
+
+					<StatTable
+						title="Items"
+						label="Item"
+						rows={stat?.bestLegendaryItems ?? []}
+						total={stat?.games ?? 0}
+						rowKey={(r) => r.itemId}
+						loading={!stat}
+					>
+						{#snippet entity(r)}
+							{@const item = lolData.itemById.get(r.itemId)}
+							<div class="flex items-center gap-2" title={item?.name}>
+								{#if item}
+									<img src={item.imgUrl} alt={item.name} class="size-7 shrink-0 rounded" loading="lazy" />
+								{:else}
+									<div class="size-7 shrink-0 rounded bg-elevated"></div>
+								{/if}
+								<span class="truncate font-medium">{item?.name ?? r.itemId}</span>
+							</div>
+						{/snippet}
+					</StatTable>
+				</div>
 			</div>
 		{/if}
 	{/if}

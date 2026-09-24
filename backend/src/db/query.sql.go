@@ -549,7 +549,7 @@ func (q *Queries) GetPlayersByIds(ctx context.Context, ids []string) ([]LolPlaye
 }
 
 const listChampions = `-- name: ListChampions :many
-SELECT id, slug, name, title, img_url, patch, updated_at FROM lol_champions ORDER BY name
+SELECT id, slug, name, title, img_url, skills, patch, updated_at FROM lol_champions ORDER BY name
 `
 
 func (q *Queries) ListChampions(ctx context.Context) ([]LolChampion, error) {
@@ -567,6 +567,7 @@ func (q *Queries) ListChampions(ctx context.Context) ([]LolChampion, error) {
 			&i.Name,
 			&i.Title,
 			&i.ImgUrl,
+			&i.Skills,
 			&i.Patch,
 			&i.UpdatedAt,
 		); err != nil {
@@ -617,10 +618,10 @@ func (q *Queries) ListItems(ctx context.Context) ([]LolItem, error) {
 }
 
 const listRunes = `-- name: ListRunes :many
-SELECT id, style_id, slot, slug, name, short_desc, img_url, patch, updated_at FROM lol_runes ORDER BY style_id NULLS FIRST, slot, id
+SELECT id, style_id, slot, sort_order, slug, name, short_desc, img_url, patch, updated_at FROM lol_runes ORDER BY style_id NULLS FIRST, slot NULLS FIRST, sort_order
 `
 
-// Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng.
+// Cây trước, rồi tới rune của từng cây theo đúng thứ tự hàng; trong 1 hàng theo thứ tự trong game.
 func (q *Queries) ListRunes(ctx context.Context) ([]LolRune, error) {
 	rows, err := q.db.Query(ctx, listRunes)
 	if err != nil {
@@ -634,6 +635,7 @@ func (q *Queries) ListRunes(ctx context.Context) ([]LolRune, error) {
 			&i.ID,
 			&i.StyleID,
 			&i.Slot,
+			&i.SortOrder,
 			&i.Slug,
 			&i.Name,
 			&i.ShortDesc,
@@ -897,13 +899,16 @@ WITH item_rows AS (
     FROM lol_match_participants p
     JOIN lol_matches m ON m.id = p.match_id
     CROSS JOIN LATERAL unnest(p.items) AS iid
-    JOIN lol_items it ON it.id = iid AND it.type = 'LEGENDARY'
-    WHERE m.patch = $2::text
+    -- iid không có trong transformed_ids => array_position NULL => phần tử NULL => giữ iid.
+    JOIN lol_items it
+        ON it.id = COALESCE(($2::int[])[array_position($3::int[], iid)], iid)
+       AND it.type = 'LEGENDARY'
+    WHERE m.patch = $4::text
       AND m.mode = 'SOLO'
       AND NOT m.is_remake
-      AND m.duration_sec >= $3::int
-      AND m.estimated_rank = ANY($4::text[])
-      AND ($5::text = 'GLOBAL' OR m.server = $5::text)
+      AND m.duration_sec >= $5::int
+      AND m.estimated_rank = ANY($6::text[])
+      AND ($7::text = 'GLOBAL' OR m.server = $7::text)
       AND p.position <> 'UNK'
 ),
 agg AS (
@@ -929,17 +934,22 @@ WHERE cs.meta_id = $1::uuid
 `
 
 type RefreshChampionStatsLegendaryItemsParams struct {
-	MetaID      pgtype.UUID `json:"metaId"`
-	Patch       string      `json:"patch"`
-	MinDuration int32       `json:"minDuration"`
-	Ranks       []string    `json:"ranks"`
-	Server      string      `json:"server"`
+	MetaID         pgtype.UUID `json:"metaId"`
+	BaseIds        []int32     `json:"baseIds"`
+	TransformedIds []int32     `json:"transformedIds"`
+	Patch          string      `json:"patch"`
+	MinDuration    int32       `json:"minDuration"`
+	Ranks          []string    `json:"ranks"`
+	Server         string      `json:"server"`
 }
 
-// Item legendary: unnest items rồi lọc theo lol_items.type.
+// Item legendary: unnest items rồi lọc theo lol_items.type. Item biến đổi (Muramana...) gộp về
+// item gốc (Manamune...) theo cặp transformed_ids[i] => base_ids[i] app truyền vào.
 func (q *Queries) RefreshChampionStatsLegendaryItems(ctx context.Context, arg RefreshChampionStatsLegendaryItemsParams) error {
 	_, err := q.db.Exec(ctx, refreshChampionStatsLegendaryItems,
 		arg.MetaID,
+		arg.BaseIds,
+		arg.TransformedIds,
 		arg.Patch,
 		arg.MinDuration,
 		arg.Ranks,
@@ -1348,13 +1358,14 @@ func (q *Queries) SearchPlayers(ctx context.Context, arg SearchPlayersParams) ([
 }
 
 const upsertChampion = `-- name: UpsertChampion :exec
-INSERT INTO lol_champions (id, slug, name, title, img_url, patch)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO lol_champions (id, slug, name, title, img_url, skills, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE SET
     slug       = EXCLUDED.slug,
     name       = EXCLUDED.name,
     title      = EXCLUDED.title,
     img_url    = EXCLUDED.img_url,
+    skills     = EXCLUDED.skills,
     patch      = EXCLUDED.patch,
     updated_at = now()
 `
@@ -1365,6 +1376,7 @@ type UpsertChampionParams struct {
 	Name   string `json:"name"`
 	Title  string `json:"title"`
 	ImgUrl string `json:"imgUrl"`
+	Skills []byte `json:"skills"`
 	Patch  string `json:"patch"`
 }
 
@@ -1375,6 +1387,7 @@ func (q *Queries) UpsertChampion(ctx context.Context, arg UpsertChampionParams) 
 		arg.Name,
 		arg.Title,
 		arg.ImgUrl,
+		arg.Skills,
 		arg.Patch,
 	)
 	return err
@@ -1538,11 +1551,12 @@ func (q *Queries) UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) erro
 }
 
 const upsertRune = `-- name: UpsertRune :exec
-INSERT INTO lol_runes (id, style_id, slot, slug, name, short_desc, img_url, patch)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO lol_runes (id, style_id, slot, sort_order, slug, name, short_desc, img_url, patch)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (id) DO UPDATE SET
     style_id   = EXCLUDED.style_id,
     slot       = EXCLUDED.slot,
+    sort_order = EXCLUDED.sort_order,
     slug       = EXCLUDED.slug,
     name       = EXCLUDED.name,
     short_desc = EXCLUDED.short_desc,
@@ -1555,6 +1569,7 @@ type UpsertRuneParams struct {
 	ID        int32       `json:"id"`
 	StyleID   pgtype.Int4 `json:"styleId"`
 	Slot      pgtype.Int4 `json:"slot"`
+	SortOrder int32       `json:"sortOrder"`
 	Slug      string      `json:"slug"`
 	Name      string      `json:"name"`
 	ShortDesc string      `json:"shortDesc"`
@@ -1568,6 +1583,7 @@ func (q *Queries) UpsertRune(ctx context.Context, arg UpsertRuneParams) error {
 		arg.ID,
 		arg.StyleID,
 		arg.Slot,
+		arg.SortOrder,
 		arg.Slug,
 		arg.Name,
 		arg.ShortDesc,

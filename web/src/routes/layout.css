@@ -11,9 +11,9 @@
 		'IBM Plex Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
 	--color-base: #17181c; /* nền trang */
-	--color-surface: #1d1f24; /* header, card */
-	--color-elevated: #26282e; /* dropdown, input, hover */
-	--color-line: #31343b; /* viền */
+	--color-surface: #222429; /* header, card */
+	--color-elevated: #2b2e34; /* dropdown, input, hover */
+	--color-line: #363940; /* viền */
 	--color-ink: #e7e8ea; /* chữ chính */
 	--color-muted: #9497a0; /* chữ phụ, icon */
 	--color-accent: #e5b53c;

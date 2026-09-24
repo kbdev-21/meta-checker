@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import Header from '$lib/components/Header.svelte';
+	import Header from '$lib/components/layout/Header.svelte';
 	import { loadLolData } from '$lib/stores/lol-data.svelte';
 
 	let { children } = $props();

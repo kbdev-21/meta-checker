@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -17,13 +18,20 @@ const ddragonLang = "en_US"
 // ---------- entity ----------
 
 type Champion struct {
-	Id        int32     `json:"id"`
-	Slug      string    `json:"slug"`
-	Name      string    `json:"name"`
-	Title     string    `json:"title"`
-	ImgUrl    string    `json:"imgUrl"`
-	Patch     string    `json:"patch"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Id        int32           `json:"id"`
+	Slug      string          `json:"slug"`
+	Name      string          `json:"name"`
+	Title     string          `json:"title"`
+	ImgUrl    string          `json:"imgUrl"`
+	Skills    []ChampionSkill `json:"skills"` // Q, W, E, R
+	Patch     string          `json:"patch"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// Skill Q/W/E/R của champion (ddragon gọi là "spells", đổi tên để không lẫn với summoner spell).
+type ChampionSkill struct {
+	Name   string `json:"name"`
+	ImgUrl string `json:"imgUrl"`
 }
 
 func ToChampion(c db.LolChampion) Champion {
@@ -33,6 +41,7 @@ func ToChampion(c db.LolChampion) Champion {
 		Name:      c.Name,
 		Title:     c.Title,
 		ImgUrl:    c.ImgUrl,
+		Skills:    unmarshalBuild[ChampionSkill](c.Skills),
 		Patch:     c.Patch,
 		UpdatedAt: c.UpdatedAt.Time,
 	}
@@ -191,12 +200,21 @@ func (a *Application) UpdateChampions(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		skills := []ChampionSkill{}
+		for _, s := range c.Spells {
+			skills = append(skills, ChampionSkill{Name: s.Name, ImgUrl: external.DDImgUrl(version, s.Image)})
+		}
+		skillsJson, err := json.Marshal(skills)
+		if err != nil {
+			return err
+		}
 		err = q.UpsertChampion(ctx, db.UpsertChampionParams{
 			ID:     int32(id),
 			Slug:   c.Id,
 			Name:   c.Name,
 			Title:  c.Title,
 			ImgUrl: external.DDImgUrl(version, c.Image),
+			Skills: skillsJson,
 			Patch:  shared.PatchOf(version),
 		})
 		if err != nil {
@@ -225,7 +243,7 @@ func (a *Application) UpdateItems(ctx context.Context) error {
 	q := a.q.WithTx(tx)
 
 	for key, it := range items {
-		t, ok := itemTypeOf(it)
+		t, ok := itemTypeOf(it, items)
 		if !ok {
 			continue
 		}
@@ -319,24 +337,27 @@ func (a *Application) UpdateRunes(ctx context.Context) error {
 	q := a.q.WithTx(tx)
 	patch := shared.PatchOf(version)
 
-	for _, t := range trees {
+	// Thứ tự trong mảng ddragon = thứ tự trong game, lưu lại vì id không theo thứ tự đó.
+	for treeOrder, t := range trees {
 		err = q.UpsertRune(ctx, db.UpsertRuneParams{
-			ID:     int32(t.Id),
-			Slug:   t.Key,
-			Name:   t.Name,
-			ImgUrl: external.DDRuneIconUrl(t.Icon),
-			Patch:  patch,
+			ID:        int32(t.Id),
+			SortOrder: int32(treeOrder),
+			Slug:      t.Key,
+			Name:      t.Name,
+			ImgUrl:    external.DDRuneIconUrl(t.Icon),
+			Patch:     patch,
 			// StyleID / Slot bỏ trống: đây là cây, không thuộc cây nào.
 		})
 		if err != nil {
 			return err
 		}
 		for slot, s := range t.Slots {
-			for _, r := range s.Runes {
+			for runeOrder, r := range s.Runes {
 				err = q.UpsertRune(ctx, db.UpsertRuneParams{
 					ID:        int32(r.Id),
 					StyleID:   pgtype.Int4{Int32: int32(t.Id), Valid: true},
 					Slot:      pgtype.Int4{Int32: int32(slot), Valid: true},
+					SortOrder: int32(runeOrder),
 					Slug:      r.Key,
 					Name:      r.Name,
 					ShortDesc: r.ShortDesc,

@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Match, MatchParticipant, Server } from '$lib/api';
-	import ChampionIcon from '$lib/components/ChampionIcon.svelte';
-	import PerfScoreBadge from '$lib/components/PerfScoreBadge.svelte';
-	import PerfScoreLabel from '$lib/components/PerfScoreLabel.svelte';
-	import { pct0 } from '$lib/format';
-	import { playerHref } from '$lib/riot-id';
+	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
+	import PerfScoreLabel from '$lib/components/player/PerfScoreLabel.svelte';
+	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
+	import { championHref } from '$lib/utils/champion';
+	import { pct0 } from '$lib/utils/format';
+	import { playerHref } from '$lib/utils/riot-id';
 
 	type Props = {
 		match: Match;
@@ -106,7 +107,9 @@
 				<div class="flex min-w-0 items-center gap-1.5">
 					<div class="relative shrink-0">
 						{#if champ}
-							<ChampionIcon src={champ.imgUrl} alt={champ.name} title={champ.name} class="size-8 rounded-full" />
+							<a href={championHref(champ.slug, { position: p.position })}>
+								<ChampionIcon src={champ.imgUrl} alt={champ.name} title={champ.name} class="size-8 rounded-full" />
+							</a>
 						{:else}
 							<div class="size-8 rounded-full bg-elevated"></div>
 						{/if}

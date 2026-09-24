@@ -419,9 +419,11 @@ func (a *Application) refreshMeta(ctx context.Context, patch, server string, buc
 	if err != nil {
 		return err
 	}
+	transformedIds, baseIds := transformedItemPairs()
 	err = q.RefreshChampionStatsLegendaryItems(ctx, db.RefreshChampionStatsLegendaryItemsParams{
 		MetaID: metaId, Patch: patch,
 		MinDuration: analyticsMinDurationSec, Ranks: ranks, Server: server,
+		TransformedIds: transformedIds, BaseIds: baseIds,
 	})
 	if err != nil {
 		return err
@@ -478,6 +480,15 @@ func (a *Application) refreshMeta(ctx context.Context, patch, server string, buc
 	}
 
 	return tx.Commit(ctx)
+}
+
+// transformedItemBases tách thành 2 mảng song song để truyền vào SQL: transformedIds[i] => baseIds[i].
+func transformedItemPairs() (transformedIds, baseIds []int32) {
+	for transformed, base := range transformedItemBases {
+		transformedIds = append(transformedIds, transformed)
+		baseIds = append(baseIds, base)
+	}
+	return transformedIds, baseIds
 }
 
 // Các estimated_rank thuộc 1 bucket.

@@ -45,3 +45,15 @@ export function rankLabel(rank: Rank | null, tier: Tier | null): string {
 export function pct0(v: number): string {
 	return `${Math.round(v * 100)}%`;
 }
+
+// Phân số 0-1 => "56.94%"
+export function pct2(v: number): string {
+	return `${(v * 100).toFixed(2)}%`;
+}
+
+// Class màu chữ của win rate (phân số 0-1): >= 55% xanh, < 45% đỏ, còn lại trắng.
+export function winRateColor(v: number): string {
+	if (v >= 0.55) return 'text-sky-400';
+	if (v < 0.45) return 'text-red-400';
+	return 'text-ink';
+}

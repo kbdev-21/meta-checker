@@ -2,6 +2,7 @@ package app
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"backend/src/external"
@@ -281,9 +282,21 @@ const (
 	ItemTypeLegendary  ItemType = "LEGENDARY"  // có from, không into
 )
 
-// Xét theo thứ tự các ItemType ở trên. ok = false nếu không thuộc loại nào
-// (item không mua được, item riêng của tướng...).
-func itemTypeOf(it external.DDItem) (t ItemType, ok bool) {
+// Item biến đổi => item gốc (ddragon specialRecipe). Không mua được, chỉ biến từ item gốc khi
+// đủ điều kiện; timeline cũng không bắn ITEM_PURCHASED cho chúng. Analytics gộp về item gốc
+// để 1 lựa chọn build không bị tách làm 2 dòng. Riot thêm item biến đổi mới thì bổ sung ở đây.
+var transformedItemBases = map[int32]int32{
+	3042: 3004, // Muramana <= Manamune
+	3040: 3003, // Seraph's Embrace <= Archangel's Staff
+	3121: 3119, // Fimbulwinter <= Winter's Approach
+	2530: 2526, // Diadem of Songs <= Whispering Circlet
+	3866: 3865, // Runic Compass <= World Atlas
+}
+
+// Xét theo thứ tự các ItemType ở trên; item biến đổi (specialRecipe) không khớp loại nào thì lấy
+// loại của item gốc. ok = false nếu không thuộc loại nào (item không mua được, item riêng của tướng...).
+// items: toàn bộ item.json, để tra item gốc.
+func itemTypeOf(it external.DDItem, items map[string]external.DDItem) (t ItemType, ok bool) {
 	hasFrom, hasInto := len(it.From) > 0, len(it.Into) > 0
 	switch {
 	case slices.Contains(it.Tags, "Consumable"):
@@ -300,6 +313,12 @@ func itemTypeOf(it external.DDItem) (t ItemType, ok bool) {
 		return ItemTypeEpic, true
 	case hasFrom && !hasInto:
 		return ItemTypeLegendary, true
+	case it.SpecialRecipe != 0:
+		base, found := items[strconv.Itoa(it.SpecialRecipe)]
+		if !found {
+			return "", false
+		}
+		return itemTypeOf(base, items)
 	}
 	return "", false
 }

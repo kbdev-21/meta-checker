@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS lol_champions (
     name        TEXT        NOT NULL,
     title       TEXT        NOT NULL,
     img_url     TEXT        NOT NULL,              -- URL đầy đủ tới ảnh trên ddragon
+    skills      JSONB       NOT NULL DEFAULT '[]', -- [{"name":Text,"imgUrl":Text}] theo thứ tự Q, W, E, R
     patch       TEXT        NOT NULL,              -- patch lúc sync, vd "16.18" (cắt từ ddragon version "16.18.1")
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS lol_runes (
     style_id    INTEGER     REFERENCES lol_runes (id) ON DELETE CASCADE,
                                                    -- NULL = dòng này LÀ một cây; khác NULL = rune thuộc cây đó
     slot        INTEGER,                           -- hàng trong cây, 0 = hàng keystone; NULL với cây
+    sort_order  INTEGER     NOT NULL DEFAULT 0,    -- thứ tự trong hàng theo ddragon (= thứ tự trong game); cây: thứ tự cây
     slug        TEXT        NOT NULL UNIQUE,       -- ddragon "key": "Precision" | "Electrocute"
     name        TEXT        NOT NULL,
     short_desc  TEXT        NOT NULL DEFAULT '',   -- luôn rỗng với cây
@@ -273,3 +275,9 @@ CREATE TABLE IF NOT EXISTS lol_champion_bans (
 
     PRIMARY KEY (meta_id, champion_id)
 );
+
+--SELECT position, count(*) AS games
+--FROM lol_match_participants
+--WHERE perf_score >= 75
+--GROUP BY position
+--ORDER BY games DESC;

@@ -3,6 +3,8 @@
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import type { Snippet } from 'svelte';
 
+	import { winRateColor } from '$lib/utils/format';
+
 	// Bảng thống kê (item, matchup...) của 1 champion: số trận, % xuất hiện, win rate.
 	type Props = {
 		title: string;
@@ -63,7 +65,7 @@
 		<button
 			type="button"
 			onclick={() => toggleSort(key)}
-			class="relative uppercase tracking-wide outline-none transition-colors hover:text-ink focus-visible:text-ink {active
+			class="relative tracking-wide outline-none transition-colors hover:text-ink focus-visible:text-ink {active
 				? 'text-ink'
 				: ''}"
 		>
@@ -80,12 +82,14 @@
 <section class="overflow-hidden rounded-lg border border-line bg-surface">
 	<h2 class="border-b border-line px-4 py-2.5 text-sm font-semibold">{title}</h2>
 
-	<!-- danh sách dài (hàng chục dòng) nên cuộn trong island, header dính trên cùng -->
-	<div class="max-h-[560px] overflow-y-auto">
+	<!-- danh sách dài (hàng chục dòng) nên cuộn trong island, header dính trên cùng.
+	     556px = header ~31px + 12 dòng x ~43.7px: vừa đủ hiện 12 dòng, còn lại cuộn. -->
+	<div class="max-h-[556px] overflow-y-auto">
 		<table class="w-full text-xs">
-			<thead class="sticky top-0 bg-surface">
+			<!-- z-10: ChampionIcon có transform (scale) nên tạo stacking context, không có z thì bị icon đè khi cuộn -->
+			<thead class="sticky top-0 z-10 bg-surface">
 				<tr class="border-b border-line text-[11px] text-muted">
-					<th class="px-3 py-2 text-left font-semibold uppercase tracking-wide">{label}</th>
+					<th class="px-3 py-2 text-left font-semibold tracking-wide">{label}</th>
 					{@render sortableHeader('GAMES', 'Games')}
 					{@render sortableHeader('WIN_RATE', 'Win rate')}
 				</tr>
@@ -116,7 +120,9 @@
 								<div>{row.games.toLocaleString('en-US')}</div>
 								<div class="text-[11px] text-muted">{pct(row.games / total)}</div>
 							</td>
-							<td class="px-2 py-1.5 text-center font-semibold">{pct(row.wins / row.games)}</td>
+							<td class="px-2 py-1.5 text-center font-semibold {winRateColor(row.wins / row.games)}">
+								{pct(row.wins / row.games)}
+							</td>
 						</tr>
 					{/each}
 				{/if}

@@ -3,8 +3,8 @@
 	import Search from '@lucide/svelte/icons/search';
 
 	import type { MetaServer, Position } from '$lib/api';
-	import MetaServerSelect from '$lib/components/MetaServerSelect.svelte';
-	import { POSITION_ICONS } from '$lib/positions';
+	import MetaServerSelect from '$lib/components/shared/MetaServerSelect.svelte';
+	import { POSITION_ICONS } from '$lib/utils/positions';
 
 	// Meta solo queue không có UNK nên chỉ lọc theo 5 lane.
 	const FILTER_POSITIONS: Position[] = ['TOP', 'JGL', 'MID', 'ADC', 'SPT'];

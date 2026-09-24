@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import type { Rank, Tier } from '$lib/api';
-	import { rankEmblemUrl } from '$lib/cdragon';
-	import { pct0, rankLabel } from '$lib/format';
+	import { rankEmblemUrl } from '$lib/utils/cdragon';
+	import { pct0, rankLabel } from '$lib/utils/format';
 
 	type Props = {
 		title: string;

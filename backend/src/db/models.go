@@ -14,6 +14,7 @@ type LolChampion struct {
 	Name      string             `json:"name"`
 	Title     string             `json:"title"`
 	ImgUrl    string             `json:"imgUrl"`
+	Skills    []byte             `json:"skills"`
 	Patch     string             `json:"patch"`
 	UpdatedAt pgtype.Timestamptz `json:"updatedAt"`
 }
@@ -195,6 +196,7 @@ type LolRune struct {
 	ID        int32              `json:"id"`
 	StyleID   pgtype.Int4        `json:"styleId"`
 	Slot      pgtype.Int4        `json:"slot"`
+	SortOrder int32              `json:"sortOrder"`
 	Slug      string             `json:"slug"`
 	Name      string             `json:"name"`
 	ShortDesc string             `json:"shortDesc"`

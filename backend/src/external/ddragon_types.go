@@ -29,6 +29,13 @@ type DDChampion struct {
 	Info    DDChampionInfo     `json:"info"`
 	Image   DDImage            `json:"image"`
 	Stats   map[string]float64 `json:"stats"`
+	Spells  []DDChampionSpell  `json:"spells"` // Q, W, E, R; chỉ có trong championFull.json
+}
+
+type DDChampionSpell struct {
+	Id    string  `json:"id"` // "JinxQ"
+	Name  string  `json:"name"`
+	Image DDImage `json:"image"`
 }
 
 type DDChampionInfo struct {
@@ -52,6 +59,9 @@ type DDItem struct {
 	Gold        DDItemGold         `json:"gold"`
 	Stats       map[string]float64 `json:"stats"`
 	Image       DDImage            `json:"image"`
+
+	// Item biến đổi (Muramana, Seraph...): không mua được, biến từ item có id này. 0 = không phải.
+	SpecialRecipe int `json:"specialRecipe"`
 }
 
 type DDItemGold struct {
