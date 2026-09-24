@@ -10,7 +10,7 @@
 	let { tier, class: className = '' }: Props = $props();
 
 	const TIER_BG: Record<ChampionTier, string> = {
-		S: 'bg-amber-300',
+		S: 'bg-accent', // cùng màu vàng với logo / accent của app
 		A: 'bg-sky-400',
 		B: 'bg-emerald-400',
 		C: 'bg-gray-400',

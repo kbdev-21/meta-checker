@@ -16,12 +16,13 @@
 	import PerfScoreBadge from '$lib/components/player/PerfScoreBadge.svelte';
 	import RankCard from '$lib/components/player/RankCard.svelte';
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import ServerBadge from '$lib/components/shared/ServerBadge.svelte';
 	import { isFollowed, toggleFollow } from '$lib/stores/followed-players.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
 	import { ddragonVersionOf, profileIconUrl } from '$lib/utils/ddragon';
-	import { pct0 } from '$lib/utils/format';
+	import { pct0, rankLabel } from '$lib/utils/format';
 	import { POSITION_ICONS } from '$lib/utils/positions';
 
 	let { data } = $props();
@@ -150,12 +151,20 @@
 		};
 	});
 
+	// Title / description: lấy name/tag từ player khi đã load (đúng hoa thường), chưa có thì từ URL.
+	const riotId = $derived(player ? `${player.name}#${player.tag}` : `${data.name}#${data.tag}`);
+	const metaDescription = $derived(
+		`${riotId} League of Legends profile on ${data.server}${player ? ` (Solo/Duo: ${rankLabel(player.soloRank, player.soloTier)})` : ''}: rank, recent matches, champion stats and performance score.`
+	);
+
 	const kdaOf = (c: { kills: number; deaths: number; assists: number }) =>
 		((c.kills + c.assists) / Math.max(c.deaths, 1)).toFixed(2);
 
 	// Vòng tròn win rate: chu vi của r = 28.
 	const RING_CIRCUMFERENCE = 2 * Math.PI * 28;
 </script>
+
+<PageMeta title="{riotId} ({data.server})" description={metaDescription} />
 
 {#if playerLoading && !player}
 	<!-- skeleton phần header trong lúc chờ player -->

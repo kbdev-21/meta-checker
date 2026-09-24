@@ -19,7 +19,7 @@
 		onclick={() => (open = !open)}
 		aria-haspopup="menu"
 		aria-expanded={open}
-		class="flex h-9 items-center gap-1.5 rounded-md bg-elevated px-2.5 py-1.5 text-sm text-muted outline-none ring-1 ring-line transition-colors hover:bg-white/5 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent/60"
+		class="flex h-9 items-center gap-1.5 rounded-md bg-elevated px-2.5 py-1.5 text-sm font-semibold text-muted outline-none ring-1 ring-line transition-colors hover:bg-white/5 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent/60"
 	>
 		<span class="hidden lg:inline">{selected.name}</span>
 		<span class="lg:hidden">{selected.short}</span>

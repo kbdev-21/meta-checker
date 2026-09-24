@@ -19,6 +19,7 @@
 	import SpellComboPanel from '$lib/components/champion-detail/SpellComboPanel.svelte';
 	import StatTable from '$lib/components/champion-detail/StatTable.svelte';
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import MetaServerSelect from '$lib/components/shared/MetaServerSelect.svelte';
 	import TierBadge from '$lib/components/shared/TierBadge.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
@@ -139,6 +140,17 @@
 		);
 	});
 
+	// Title / description: có stat thì kèm lane + patch, chưa có thì chỉ tên champion.
+	const championName = $derived(champion?.name ?? data.slug);
+	const metaTitle = $derived(
+		`${championName}${stat ? ` ${POSITION_LABEL[stat.position]}` : ''} Build, Runes & Counters`
+	);
+	const metaDescription = $derived(
+		stat
+			? `${championName} ${POSITION_LABEL[stat.position]} build for patch ${stat.patch} (${RANK_BUCKET_LABEL[stat.rankBucket]}): best runes, summoner spells, skill order, items and matchups.`
+			: `${championName} build: best runes, summoner spells, skill order, items and matchups.`
+	);
+
 	function oneOf<T extends string, F>(value: string | null, allowed: readonly T[], fallback: F): T | F {
 		return allowed.includes(value as T) ? (value as T) : fallback;
 	}
@@ -160,6 +172,8 @@
 {#snippet percent(v: number)}
 	{(v * 100).toFixed(1)}<span class="ml-0.5 text-xs font-normal text-muted">%</span>
 {/snippet}
+
+<PageMeta title={metaTitle} description={metaDescription} />
 
 <div class="mx-auto max-w-[1100px] px-5 pt-4">
 	{#if lolData.isLoaded && !champion}

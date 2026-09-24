@@ -16,7 +16,9 @@
 	--color-line: #363940; /* viền */
 	--color-ink: #e7e8ea; /* chữ chính */
 	--color-muted: #9497a0; /* chữ phụ, icon */
-	--color-accent: #e5b53c;
+	/* "amber-350": giữa amber-300 và amber-400 (oklch 0.8535 0.179 88.0). Dùng chung cho tier S
+	   và logo: đổi màu thì sửa cả fill trong brand-icon.svg. */
+	--color-accent: #ffc600;
 }
 
 :root {

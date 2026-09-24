@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import brandIcon from '$lib/assets/brand-icon.svg';
 	import Header from '$lib/components/layout/Header.svelte';
 	import { loadLolData } from '$lib/stores/lol-data.svelte';
 
@@ -13,7 +13,9 @@
 	});
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<!-- title / description do từng page đặt qua PageMeta: đặt ở đây thì layout render trước page,
+     <title> của layout sẽ thắng. -->
+<svelte:head><link rel="icon" type="image/svg+xml" href={brandIcon} /></svelte:head>
 
 <Header />
 {@render children()}

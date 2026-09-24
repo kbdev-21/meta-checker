@@ -18,6 +18,7 @@
 	} from '$lib/api';
 	import ChampionsToolbar from '$lib/components/champions/ChampionsToolbar.svelte';
 	import ChampionIcon from '$lib/components/shared/ChampionIcon.svelte';
+	import PageMeta from '$lib/components/shared/PageMeta.svelte';
 	import TierBadge from '$lib/components/shared/TierBadge.svelte';
 	import { lolData } from '$lib/stores/lol-data.svelte';
 	import { championHref } from '$lib/utils/champion';
@@ -197,6 +198,13 @@
 		</button>
 	</th>
 {/snippet}
+
+<PageMeta
+	title="LoL Champion Tier List"
+	description="League of Legends champion tier list{meta
+		? ` for patch ${meta.patch}`
+		: ''}: win rate, pick rate, ban rate and counters for every position."
+/>
 
 <div class="mx-auto max-w-[1100px] px-5 py-6">
 	<div class="mb-4">

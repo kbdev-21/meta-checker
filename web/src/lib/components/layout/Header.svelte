@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ChartNoAxesColumnIncreasing from "@lucide/svelte/icons/chart-no-axes-column-increasing";
 	import Info from "@lucide/svelte/icons/info";
 	import { page } from "$app/state";
+	import brandIcon from "$lib/assets/brand-icon.svg";
 	import GameSelect from "./GameSelect.svelte";
 	import SearchBar from "./SearchBar.svelte";
 
@@ -24,11 +24,12 @@
 			href="/"
 			class="flex shrink-0 items-center gap-2.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
 		>
-			<ChartNoAxesColumnIncreasing
-				class="size-6 text-accent"
-				strokeWidth={2.5}
-			/>
-			<span class="text-2xl font-bold tracking-tight">MetaChecker</span>
+			<!-- logo = icon + wordmark. Wordmark dựng bằng chữ HTML thay vì file svg: <text> trong
+			     svg không khai báo font, nhúng qua <img> sẽ ra font serif mặc định. -->
+			<img src={brandIcon} alt="" class="size-7" />
+			<span class="text-2xl font-bold tracking-tight">
+				meta<span class="text-accent">checker</span>
+			</span>
 		</a>
 
 		<GameSelect />
