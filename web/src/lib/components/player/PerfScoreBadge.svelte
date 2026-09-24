@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Tooltip from '$lib/components/shared/Tooltip.svelte';
+
 	type Size = 'SM' | 'MD';
 
 	type Props = {
@@ -9,6 +11,8 @@
 	};
 
 	let { score, size = 'MD' }: Props = $props();
+
+	const TOOLTIP = "Performance score (0-100) calculated by MetaChecker's formula";
 
 	const SIZE_CLASS: Record<Size, string> = {
 		SM: 'h-6 w-8 rounded text-sm',
@@ -33,16 +37,18 @@
 	);
 </script>
 
-<span
-	class="relative inline-grid place-items-center overflow-hidden font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] {SIZE_CLASS[
-		size
-	]} {tone}"
->
-	{score}
-	{#if isPremium}
-		<span class="shine" aria-hidden="true"></span>
-	{/if}
-</span>
+<Tooltip content={TOOLTIP}>
+	<span
+		class="relative inline-grid place-items-center overflow-hidden font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] {SIZE_CLASS[
+			size
+		]} {tone}"
+	>
+		{score}
+		{#if isPremium}
+			<span class="shine" aria-hidden="true"></span>
+		{/if}
+	</span>
+</Tooltip>
 
 <style>
 	/* Vệt sáng quét chéo qua badge premium, nghỉ một nhịp giữa các lần quét. */

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import brandIcon from '$lib/assets/brand-icon.svg';
+	import Footer from '$lib/components/layout/Footer.svelte';
 	import Header from '$lib/components/layout/Header.svelte';
 	import TooltipHost from '$lib/components/layout/TooltipHost.svelte';
 	import { loadLolData } from '$lib/stores/lol-data.svelte';
@@ -18,7 +19,11 @@
      <title> của layout sẽ thắng. -->
 <svelte:head><link rel="icon" type="image/svg+xml" href={brandIcon} /></svelte:head>
 
-<Header />
-{@render children()}
+<!-- flex-col + flex-1: trang ngắn thì footer vẫn nằm sát đáy màn hình -->
+<div class="flex min-h-dvh flex-col">
+	<Header />
+	<div class="flex-1">{@render children()}</div>
+	<Footer />
+</div>
 <!-- 1 tooltip dùng chung cho mọi <Tooltip> trong app -->
 <TooltipHost />

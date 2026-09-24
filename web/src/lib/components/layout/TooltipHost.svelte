@@ -65,7 +65,7 @@
 					customAnchor={anchor}
 					{side}
 					sideOffset={6}
-					class="pointer-events-none z-50 max-w-xs rounded-md bg-elevated px-2.5 py-1.5 text-xs text-ink shadow-lg ring-1 ring-line"
+					class="pointer-events-none z-50 max-w-xs rounded-md bg-elevated px-2.5 py-1.5 text-center text-xs text-ink shadow-lg ring-1 ring-line"
 				>
 					{content}
 				</Tooltip.Content>

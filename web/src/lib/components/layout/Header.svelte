@@ -28,7 +28,7 @@
 			     svg không khai báo font, nhúng qua <img> sẽ ra font serif mặc định. -->
 			<img src={brandIcon} alt="" class="size-7" />
 			<span class="text-2xl font-bold tracking-tight">
-				meta<span class="text-accent">checker</span>
+				Meta<span class="text-accent">Checker</span>
 			</span>
 		</a>
 

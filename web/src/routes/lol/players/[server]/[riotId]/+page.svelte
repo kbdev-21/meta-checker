@@ -360,7 +360,7 @@
 				</div>
 
 				<div class="flex flex-col items-center gap-1">
-					<div class="text-xs text-muted">Avg Score</div>
+					<div class="text-xs text-muted">Avg MC Score</div>
 					{#if summary.avgScore !== null}
 						<PerfScoreBadge score={summary.avgScore} />
 					{:else}

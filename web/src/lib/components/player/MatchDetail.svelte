@@ -90,7 +90,7 @@
 				<span class="font-bold {resultColor(t.isWin)}">{resultText(t.isWin)}</span>
 				<span>({TEAM_SIDE[t.team]})</span>
 			</div>
-			<div class="text-center">Score</div>
+			<div class="text-center">MC Score</div>
 			<div class="text-center">KDA</div>
 			<div class="text-center">Damage</div>
 			<div class="text-center">Wards</div>

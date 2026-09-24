@@ -202,7 +202,7 @@
 
 		<!-- Perf. Score -->
 		<div class="flex w-20 shrink-0 flex-col items-center gap-1">
-			<div class="text-xs text-muted">Score</div>
+			<div class="text-xs text-muted">MC Score</div>
 			<PerfScoreBadge score={me.perfScore} />
 			{#if scoreBadge}
 				<PerfScoreLabel label={scoreBadge} />
