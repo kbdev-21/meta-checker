@@ -1,0 +1,5 @@
+# Route không prerender (prerender = false) không có file HTML riêng: rewrite (200) về
+# SPA fallback 200.html để router client tự render. Cloudflare Pages bỏ đuôi .html nên đích là /200.
+# Không dùng /* vì _redirects chạy trước static asset, sẽ đè lên trang prerender và _app/*.
+/lol/players/*    /200    200
+/lol/champions/*  /200    200
