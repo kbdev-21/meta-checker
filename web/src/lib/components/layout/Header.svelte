@@ -12,8 +12,7 @@
 	// TODO: prefix /lol đang hardcode vì mới có 1 game; có thêm game thì suy từ GameSelect.
 	const NAV = [
 		{ label: "Champions", href: "/lol/champions", disabled: false },
-		{ label: "What's to pick", href: "/lol/whats-to-pick", disabled: true },
-		{ label: "Randomizer", href: "/lol/randomizer", disabled: true },
+		{ label: "Randomizer", href: "/lol/randomizer", disabled: false },
 		{ label: "Game Data", href: "/lol/game-data", disabled: true },
 	];
 </script>

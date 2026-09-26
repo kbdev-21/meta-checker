@@ -209,7 +209,7 @@
 
 <div class="mx-auto max-w-[1100px] px-5 py-6">
 	<div class="mb-4">
-		<h1 class="text-xl font-semibold">LOL Champion Tier List</h1>
+		<h1 class="text-xl font-semibold">LoL Champion Tier List</h1>
 		{#if meta}
 			<p class="mt-1 text-sm text-muted">
 				{meta.patch} · {RANK_BUCKET_LABEL[meta.rankBucket]} · {meta.totalMatches.toLocaleString()} matches

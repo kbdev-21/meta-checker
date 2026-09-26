@@ -548,7 +548,7 @@ func bucketRanks(b RankBucket) []string {
 func tierScoreOf(winRate, pickRate float64) int32 {
 	const winWeight, pickWeight = 65.0, 35.0
 	const minWinRate, maxWinRate = 0.46, 0.54
-	const minPickRate, maxPickRate = 0.0, 0.05
+	const minPickRate, maxPickRate = 0.0, 0.075
 
 	winScoreRatio := clamp01((winRate - minWinRate) / (maxWinRate - minWinRate))
 	pickScoreRatio := clamp01((pickRate - minPickRate) / (maxPickRate - minPickRate))
