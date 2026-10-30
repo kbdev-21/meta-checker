@@ -25,8 +25,8 @@
 	// Team 1 = blue side, team 2 = red side (theo Riot).
 	const TEAM_SIDE: Record<number, string> = { 1: 'Blue team', 2: 'Red team' };
 
-	// Cột: champion+tên | score | KDA | damage | wards | CS | items
-	const GRID = 'grid grid-cols-[minmax(0,1fr)_92px_88px_84px_44px_44px_168px] items-center gap-2';
+	// Cột: champion+tên | score | KDA | damage | wards | CS (Gold) | items
+	const GRID = 'grid grid-cols-[minmax(0,1fr)_92px_88px_84px_44px_64px_168px] items-center gap-2';
 
 	const teams = $derived(
 		[1, 2].map((t) => {
@@ -94,7 +94,7 @@
 			<div class="text-center">KDA</div>
 			<div class="text-center">Damage</div>
 			<div class="text-center">Wards</div>
-			<div class="text-center">CS</div>
+			<div class="text-center whitespace-nowrap">CS (Gold)</div>
 			<div class="text-center">Items</div>
 		</div>
 
@@ -180,10 +180,10 @@
 					<div class="text-muted">{p.wardsPlaced} / {p.wardsKilled}</div>
 				</div>
 
-				<!-- CS -->
+				<!-- CS + gold -->
 				<div class="text-center">
 					<div>{p.cs}</div>
-					<div class="text-muted">{p.csPerMin.toFixed(1)}/m</div>
+					<div class="text-[10px] text-muted">({p.gold.toLocaleString('en-US')})</div>
 				</div>
 
 				<!-- items -->
