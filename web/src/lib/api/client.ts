@@ -77,13 +77,16 @@ function send(method: string, path: string, opts: RequestOptions): Promise<Respo
 }
 
 function buildUrl(path: string, query?: QueryParams): string {
-	const url = new URL(path, API_BASE_URL);
-	for (const [key, value] of Object.entries(query ?? {})) {
-		if (value !== null && value !== undefined) {
-			url.searchParams.set(key, String(value));
-		}
-	}
-	return url.toString();
+  const base = API_BASE_URL.replace(/\/+$/, '') + '/';
+  const url = new URL(path.replace(/^\/+/, ''), base);
+
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== null && value !== undefined) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  return url.toString();
 }
 
 // 204 (endpoint update player) không có body; các endpoint còn lại luôn trả JSON.
