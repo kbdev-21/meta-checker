@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -190,6 +191,27 @@ func ToMatchParticipant(p db.LolMatchParticipant) MatchParticipant {
 }
 
 // ---------- logic ----------
+
+// CleanupMatches xóa match khác patch hiện tại; participants được DB xóa theo cascade.
+// Dùng cùng cache version và fallback của Data Dragon như các luồng hiện có.
+func (a *Application) CleanupMatches(ctx context.Context) (patch string, deleted int64, err error) {
+	version, err := a.ddragon.FetchCurrentVersion(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	patch = shared.PatchOf(version)
+	parts := strings.Split(patch, ".")
+	if len(parts) != 2 {
+		return "", 0, fmt.Errorf("invalid current patch version: %q", version)
+	}
+	major, majorErr := strconv.Atoi(parts[0])
+	minor, minorErr := strconv.Atoi(parts[1])
+	if majorErr != nil || minorErr != nil || major <= 0 || minor < 0 {
+		return "", 0, fmt.Errorf("invalid current patch version: %q", version)
+	}
+	deleted, err = a.q.DeleteMatchesExceptPatch(ctx, patch)
+	return patch, deleted, err
+}
 
 // Map MatchDto của Riot rồi lưu: 1 query lấy rank của mọi participant (rank_power / estimated_rank
 // lấy từ solo rank của các participant đã có trong lol_players), insert tất cả match + participants

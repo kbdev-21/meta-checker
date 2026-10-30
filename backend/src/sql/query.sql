@@ -154,6 +154,10 @@ VALUES (
 )
 ON CONFLICT (match_id, player_id) DO NOTHING;
 
+-- name: DeleteMatchesExceptPatch :execrows
+DELETE FROM lol_matches
+WHERE patch <> sqlc.arg(patch)::text;
+
 -- Id không có trong DB thì bỏ qua.
 -- name: GetMatchesByIds :many
 SELECT * FROM lol_matches

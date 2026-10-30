@@ -64,6 +64,19 @@ func (q *Queries) DeleteChampionStatsByMeta(ctx context.Context, metaID pgtype.U
 	return err
 }
 
+const deleteMatchesExceptPatch = `-- name: DeleteMatchesExceptPatch :execrows
+DELETE FROM lol_matches
+WHERE patch <> $1::text
+`
+
+func (q *Queries) DeleteMatchesExceptPatch(ctx context.Context, patch string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMatchesExceptPatch, patch)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getChampionStatsByMeta = `-- name: GetChampionStatsByMeta :many
 SELECT cs.meta_id, cs.position, cs.champion_id, cs.champion_slug,
        cs.games, cs.wins, cs.win_rate, cs.pick_rate,
